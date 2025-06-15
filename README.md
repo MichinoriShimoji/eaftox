@@ -20,12 +20,7 @@
 
 ```python
 #4層構造eaf（text, morph, gloss, trans）から3層構造IGTへ
-from eaf_converter3 import convert_eaf_file %
-
-#5層構造eaf（text0 (形態素境界なし), text1（基底構造で形態素境界あり）, morph, gloss, trans）から4層構造IGTへ
-from eaf_converter4 import convert_eaf_file 
-
-
+from eaf_converter3 import convert_eaf_file
 
 #読み込み後、実行：eafファイル名、eafのtier名を指定（以下の'x'を修正）
 convert_eaf_file(
@@ -41,6 +36,9 @@ convert_eaf_file(
         'translation': 'x'
     }
 )
+
+#5層構造eaf（text0 (形態素境界なし), text1（基底構造で形態素境界あり）, morph, gloss, trans）から4層構造IGTへ
+from eaf_converter4 import convert_eaf_file 
 
 #読み込み後、実行：eafファイル名、eafのtier名を指定（以下の'x'を修正）
 convert_eaf_file(
