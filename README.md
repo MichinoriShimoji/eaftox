@@ -11,6 +11,7 @@
 - `.eaf` ファイルの text/morph/gloss/translation 層を抽出
 - 文末記号（. ? !）に基づいた文分割
 - 4層構造eaf（text, morph, gloss, trans）、5層構造eaf（text0 (形態素境界なし), text1（基底構造で形態素境界あり）、morph, gloss, trans）に対応
+- さらに、形態素に分けない立場のglossing（文節ごとにスペースを入れたtext層、それを自動分割したword層, word層にグロスをつけるgloss層, trans層）にも対応
 - 自分が使用するtier名を指定することができる
 - text -> morphへの自動分割を使用している前提(ELANのmorph層で-, =の形態素記号が消失 -> 上記txt形式、LaTeX形式でこれらが自動で復活)
 - tipa 対応のためのIPA変換
@@ -61,3 +62,16 @@ convert_eaf_file(
     }
 )
 
+#3層構造eaf（text層（形態素境界なし）、word層（形態素境界なし）、gloss, trans）から3層構造IGTへ
+from eaf_converterwp import convert_eaf_simple
+
+#読み込み後、実行：まず、tier名を指定（xを修正）
+tier_names = {
+        'word': 'x',
+        'gloss': 'x', 
+        'trans': 'x',
+        'text': 'x'
+    }
+
+#その後、ファイル名を指定（xを修正）
+convert_eaf_simple('x.eaf', 'x.wav', tier_names = tier_names)
