@@ -16,6 +16,11 @@
 - tipa 対応のためのIPA変換
 - 音声 `.wav` ファイルから、文単位の切り出しとZIP保存（オプション）
 
+## 追加インストール（必要に応じて）
+```bush
+pip install librosa soundfile pydub numpy
+```
+
 ## 🛠️ 使用方法
 
 ```python
