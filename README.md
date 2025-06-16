@@ -72,5 +72,11 @@ tier_names = {
 convert_eaf_simple('x.eaf', 'x.wav', tier_names = tier_names)
 
 ```
+## サンプルファイル
+サンプルファイルは、作成者（下地理則）が用意した3つのeafファイルと1つのwavファイルからなる。
 
+- 音声ファイル：sample.wav：伊良部島方言の昔話の冒頭4文
+- sample3.eaf: sample.wavを4弾構成（text, morph, gloss, trans）で書き起こしたeafファイル。eaf_converter3.pyで処理できるデモファイル
+- sample4.eaf: sample.wavを5弾構成（text0, text1, morph, gloss, trans）で書き起こしたeafファイル。eaf_converter4.pyで処理できるデモファイル
+- samplewp.eaf: sample.wavを3弾構成（text, word, gloss, trans）で書き起こしたeafファイル。eaf_converterwp.pyで処理できるデモファイル
 
