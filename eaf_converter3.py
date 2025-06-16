@@ -1,4 +1,4 @@
-# Jupyter Lab用 EAFファイル変換コード（完全版：IPA→tipa変換、morph整列、文分割対応、音声切り出し機能付き）
+# Jupyter Lab用 EAFファイル変換コード（完全版：音声切り出し機能付き、デスクトップ保存対応）
 import xml.etree.ElementTree as ET
 import os
 import re
@@ -6,6 +6,7 @@ import shutil
 import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional
+import time
 
 # オーディオ処理ライブラリのインポート
 AUDIO_LIBRARY = None
@@ -61,7 +62,7 @@ class EAFConverter:
         self.audio_data = None
         self.sample_rate = None
         self.audio_available = False
-        
+    
     def load_audio(self):
         """音声ファイルを読み込む"""
         if not self.wav_file_path:
@@ -107,7 +108,7 @@ class EAFConverter:
         except Exception as e:
             print(f"音声ファイルの読み込みエラー: {e}")
             return False
-        
+    
     def parse_eaf(self):
         """EAFファイルを解析する"""
         try:
@@ -137,7 +138,7 @@ class EAFConverter:
             tier_id = tier.get('TIER_ID')
             print(f"  - {tier_id}")
             
-        # ティアを取得（ALIGNABLE_ANNOTATIONとREF_ANNOTATION両方をチェック）
+        # ティアを取得
         for tier in self.root.findall('TIER'):
             tier_id = tier.get('TIER_ID')
             self.tiers[tier_id] = []
@@ -181,7 +182,6 @@ class EAFConverter:
     
     def _get_ref_time(self, ref_id: str) -> tuple:
         """REF_ANNOTATIONの参照先の時間を取得"""
-        # すべてのティアを検索して参照先のアノテーションを見つける
         for tier in self.root.findall('TIER'):
             for annotation in tier.findall('.//ALIGNABLE_ANNOTATION'):
                 if annotation.get('ANNOTATION_ID') == ref_id:
@@ -189,7 +189,6 @@ class EAFConverter:
                     end_id = annotation.get('TIME_SLOT_REF2')
                     return (self.time_slots.get(start_id, 0), self.time_slots.get(end_id, 0))
             
-            # REF_ANNOTATIONが他のREF_ANNOTATIONを参照している場合
             for annotation in tier.findall('.//REF_ANNOTATION'):
                 if annotation.get('ANNOTATION_ID') == ref_id:
                     nested_ref_id = annotation.get('ANNOTATION_REF')
@@ -200,50 +199,38 @@ class EAFConverter:
     
     def _split_sentences_by_punctuation(self, text: str, morph: str, gloss: str, translation: str, start_time: int = 0, end_time: int = 0) -> List[Dict]:
         """文末記号（.、?、!）で文を分割し、時間情報も保持"""
-        # 文末記号を検出するパターン
         sentence_pattern = r'([.?!]+)'
-        
-        # text層を文末記号で分割
         text_parts = re.split(sentence_pattern, text)
         
         sentences = []
         current_text = ""
         
-        # morph層とgloss層をスペースで分割
         morph_words = morph.split() if morph else []
         gloss_words = gloss.split() if gloss else []
         
         morph_idx = 0
         gloss_idx = 0
         
-        # 時間計算用
         total_chars = len(text.replace('.', '').replace('?', '').replace('!', ''))
         current_chars = 0
         
         for part in text_parts:
-            # 文末記号かどうかチェック
             is_punctuation = bool(re.match(r'^[.?!]+$', part))
             
             if is_punctuation:
-                # 文末記号の場合
                 current_text += part
                 
-                # 現在の文を完成させる
                 if current_text.strip():
-                    # この文に対応するmorph数を計算
                     clean_text = current_text.replace('.', '').replace('?', '').replace('!', '')
                     text_words = clean_text.split()
                     num_morphs = 0
                     for word in text_words:
-                        # =や-で分割された形態素数を数える
                         morphs_in_word = len(re.split(r'[=-]', word))
                         num_morphs += morphs_in_word
                     
-                    # 対応するmorphとglossを取得
                     sent_morphs = morph_words[morph_idx:morph_idx + num_morphs] if morph_idx < len(morph_words) else []
                     sent_glosses = gloss_words[gloss_idx:gloss_idx + num_morphs] if gloss_idx < len(gloss_words) else []
                     
-                    # 時間の推定計算
                     sentence_chars = len(clean_text)
                     if total_chars > 0 and start_time != end_time:
                         char_ratio = sentence_chars / total_chars
@@ -258,28 +245,23 @@ class EAFConverter:
                         'text': current_text.strip(),
                         'morph': ' '.join(sent_morphs),
                         'gloss': ' '.join(sent_glosses),
-                        'translation': translation,  # 翻訳は全体で共有
+                        'translation': translation,
                         'start_time': sentence_start,
                         'end_time': sentence_end
                     })
                     
-                    # インデックスを更新
                     morph_idx += num_morphs
                     gloss_idx += num_morphs
                     current_chars += sentence_chars
                     current_text = ""
             
             elif part.strip():
-                # 通常のテキストの場合
                 current_text += part
         
-        # 残りのテキストがある場合
         if current_text.strip():
-            # 残りのmorphとglossを使用
             remaining_morphs = morph_words[morph_idx:] if morph_idx < len(morph_words) else []
             remaining_glosses = gloss_words[gloss_idx:] if gloss_idx < len(gloss_words) else []
             
-            # 残りの時間計算
             sentence_chars = len(current_text.replace('.', '').replace('?', '').replace('!', ''))
             if total_chars > 0 and start_time != end_time:
                 char_ratio = sentence_chars / total_chars
@@ -310,18 +292,16 @@ class EAFConverter:
     
     def extract_sentences(self, tier_names: Dict[str, str] = None) -> List[Dict]:
         """文ごとにtext, morph, gloss, translation, 時間情報を抽出"""
-        # デフォルトのティア名（実際のティア名に合わせて修正）
         if tier_names is None:
             tier_names = {
                 'text': 'text@KS',
                 'morph': 'morph@KS', 
                 'gloss': 'gloss@KS',
-                'translation': 'translation@KS'  # @TSに修正
+                'translation': 'translation@KS'
             }
         
         sentences = []
         
-        # 各ティアから対応する区間を見つける
         text_tier = self.tiers.get(tier_names['text'], [])
         morph_tier = self.tiers.get(tier_names['morph'], [])
         gloss_tier = self.tiers.get(tier_names['gloss'], [])
@@ -340,12 +320,10 @@ class EAFConverter:
             start_time = text_annotation['start_time']
             end_time = text_annotation['end_time']
             
-            # 対応するmorph, gloss, translationを見つける
             morph = self._find_overlapping_annotation(morph_tier, start_time, end_time)
             gloss = self._find_overlapping_annotation(gloss_tier, start_time, end_time)
             translation = self._find_overlapping_annotation(translation_tier, start_time, end_time)
             
-            # 文末記号で分割（時間情報付き）
             split_sentences = self._split_sentences_by_punctuation(
                 text_annotation['value'], morph, gloss, translation, start_time, end_time
             )
@@ -360,15 +338,12 @@ class EAFConverter:
         matching_annotations = []
         
         for annotation in tier_data:
-            # 時間範囲が重複するかチェック
             overlap_start = max(annotation['start_time'], start_time)
             overlap_end = min(annotation['end_time'], end_time)
             
             if overlap_start < overlap_end or (annotation['start_time'] == start_time and annotation['end_time'] == end_time):
-                # 重複がある、または完全一致の場合
                 matching_annotations.append(annotation)
         
-        # 重複するアノテーションを時間順にソートして結合
         matching_annotations.sort(key=lambda x: x['start_time'])
         return ' '.join([ann['value'] for ann in matching_annotations if ann['value']])
     
@@ -378,43 +353,31 @@ class EAFConverter:
             return False
             
         try:
-            # パディングを追加（前後に少し余裕を持たせる）
             padded_start = max(0, start_ms - padding_ms)
             
             if AUDIO_LIBRARY == 'librosa':
-                # ミリ秒をサンプル数に変換
                 start_sample = int((padded_start / 1000.0) * self.sample_rate)
                 end_sample = int((end_ms / 1000.0) * self.sample_rate)
                 padded_end_sample = min(len(self.audio_data), end_sample + int((padding_ms / 1000.0) * self.sample_rate))
                 
-                # 音声セグメントを切り出し
                 audio_segment = self.audio_data[start_sample:padded_end_sample]
-                
-                # ファイルに保存
                 sf.write(output_path, audio_segment, self.sample_rate)
                 
             elif AUDIO_LIBRARY == 'pydub':
                 padded_end = end_ms + padding_ms
-                
-                # 音声セグメントを切り出し
                 audio_segment = self.audio_data[padded_start:padded_end]
-                
-                # ファイルに保存
                 audio_segment.export(output_path, format="wav")
                 
             elif AUDIO_LIBRARY == 'wave':
-                # ミリ秒をサンプル数に変換
                 start_sample = int((padded_start / 1000.0) * self.sample_rate)
                 end_sample = int((end_ms / 1000.0) * self.sample_rate)
                 padded_end_sample = min(len(self.audio_data), end_sample + int((padding_ms / 1000.0) * self.sample_rate))
                 
-                # 音声セグメントを切り出し
                 audio_segment = self.audio_data[start_sample:padded_end_sample]
                 
-                # WAVファイルとして保存
                 with wave.open(output_path, 'wb') as wav_out:
-                    wav_out.setnchannels(1)  # モノラル
-                    wav_out.setsampwidth(2)  # 16bit
+                    wav_out.setnchannels(1)
+                    wav_out.setsampwidth(2)
                     wav_out.setframerate(self.sample_rate)
                     wav_out.writeframes(audio_segment.tobytes())
             
@@ -431,20 +394,15 @@ class EAFConverter:
             print("音声データが利用できません。音声分割はスキップされます。")
             return None
             
-        # デスクトップパスを取得
         desktop_path = get_desktop_path()
         print(f"📁 デスクトップパス: {desktop_path}")
         
-        # 出力フォルダ名を決定
         if not folder_name:
             base_name = Path(self.eaf_file_path).stem
             folder_name = f"{base_name}_sentences"
         
-        # デスクトップに出力ディレクトリを作成
         output_path = Path(desktop_path) / folder_name
         if output_path.exists():
-            # 既存フォルダがある場合はバックアップ
-            import time
             timestamp = int(time.time())
             backup_path = Path(desktop_path) / f"{folder_name}_backup_{timestamp}"
             shutil.move(str(output_path), str(backup_path))
@@ -458,19 +416,16 @@ class EAFConverter:
         
         saved_files = []
         
-        # 各文に対して音声を切り出し
         for i, sentence in enumerate(sentences, 1):
             if not sentence.get('start_time') or not sentence.get('end_time'):
                 print(f"⚠️ 文 {i} に時間情報がありません。スキップします。")
                 continue
                 
-            # ファイル名を生成（番号付き）
-            safe_text = re.sub(r'[^\w\s-]', '', sentence['text'][:30])  # 安全なファイル名
+            safe_text = re.sub(r'[^\w\s-]', '', sentence['text'][:30])
             safe_text = re.sub(r'\s+', '_', safe_text.strip())
             filename = f"{i:03d}_{safe_text}.wav"
             output_file = output_path / filename
             
-            # 音声を保存
             success = self.save_audio_segment(
                 sentence['start_time'], 
                 sentence['end_time'], 
@@ -492,12 +447,12 @@ class EAFConverter:
                 print(f"❌ 保存失敗: {filename}")
         
         # GB4E形式のTeXファイルを作成
-        print("📝 GB4E形式のTeXファイルを作成中...")
+        print("📝 GB4E形式（Leipzig.sty対応）のTeXファイルを作成中...")
         gb4e_content = self.to_gb4e_format(sentences)
-        gb4e_file = output_path / 'sentences_gb4e.tex'
+        gb4e_file = output_path / 'sentences_gb4e_leipzig.tex'
         with open(gb4e_file, 'w', encoding='utf-8', newline='\n') as f:
             f.write(gb4e_content)
-        print(f"✅ GB4E形式保存: {gb4e_file.name}")
+        print(f"✅ GB4E形式（Leipzig.sty対応）保存: {gb4e_file.name}")
         
         # DOC形式のTXTファイルを作成
         print("📄 DOC形式のTXTファイルを作成中...")
@@ -517,7 +472,7 @@ class EAFConverter:
             f.write(f"総文数: {len(saved_files)}\n")
             f.write(f"保存場所: {output_path}\n\n")
             f.write("📁 生成ファイル:\n")
-            f.write(f"  - GB4E形式: {gb4e_file.name}\n")
+            f.write(f"  - GB4E形式（Leipzig.sty対応）: {gb4e_file.name}\n")
             f.write(f"  - DOC形式: {doc_file.name}\n")
             f.write(f"  - 音声ファイル: {len(saved_files)}個\n\n")
             
@@ -530,20 +485,21 @@ class EAFConverter:
         # READMEファイルを作成
         readme_file = output_path / 'README.txt'
         with open(readme_file, 'w', encoding='utf-8') as f:
-            f.write("EAFファイル音声分割結果\n")
-            f.write("="*30 + "\n\n")
+            f.write("EAFファイル音声分割結果（Leipzig.sty対応版）\n")
+            f.write("="*40 + "\n\n")
             f.write("📁 このフォルダには以下のファイルが含まれています:\n\n")
             f.write("🎵 音声ファイル:\n")
             f.write(f"  - {len(saved_files)}個の分割された音声ファイル (001_*.wav ～ {len(saved_files):03d}_*.wav)\n")
             f.write("  - 各ファイルは文単位で分割されています\n\n")
             f.write("📝 テキストファイル:\n")
-            f.write(f"  - {gb4e_file.name}: LaTeX用gb4e形式の例文集\n")
+            f.write(f"  - {gb4e_file.name}: LaTeX用gb4e形式の例文集（Leipzig.sty対応）\n")
             f.write(f"  - {doc_file.name}: プレーンテキスト形式の例文集\n")
             f.write(f"  - {summary_file.name}: 詳細な分割情報\n")
             f.write(f"  - {readme_file.name}: この説明ファイル\n\n")
             f.write("💡 使用方法:\n")
             f.write("  - 音声ファイル: 各文の音声を個別に再生可能\n")
             f.write("  - GB4Eファイル: LaTeXでコンパイルして言語学論文用の例文集を作成\n")
+            f.write("    \\usepackage{leipzig} を忘れずに追加してください\n")
             f.write("  - DOCファイル: そのまま文書に貼り付け可能\n\n")
             f.write(f"📅 作成日時: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"🔧 元ファイル: {Path(self.eaf_file_path).name}\n")
@@ -567,7 +523,7 @@ class EAFConverter:
         if saved_files:
             print(f"\n🎉 音声分割完了!")
             print(f"🎵 保存された音声ファイル数: {len(saved_files)}")
-            print(f"📝 GB4E形式ファイル: {gb4e_file.name}")
+            print(f"📝 GB4E形式ファイル（Leipzig.sty対応）: {gb4e_file.name}")
             print(f"📄 DOC形式ファイル: {doc_file.name}")
             print(f"📁 保存場所: {output_path}")
             print(f"📋 詳細情報: {summary_file.name}")
@@ -657,160 +613,6 @@ class EAFConverter:
         
         return result
     
-    def _align_morphs_with_text(self, text: str, morph: str) -> str:
-        """text層の区切り文字（=や-）に基づいてmorph層を再配置"""
-        if not text or not morph:
-            return morph
-        
-        # morph層をスペースで分割
-        morph_list = morph.split()
-        if not morph_list:
-            return morph
-        
-        # text層を単語に分割
-        text_words = text.split()
-        result_parts = []
-        morph_idx = 0
-        
-        for word in text_words:
-            # 単語内の形態素境界を見つける（=, -）
-            # 形態素境界で分割（区切り文字も保持）
-            segments = re.split(r'([=-])', word)
-            word_morphs = []
-            
-            for segment in segments:
-                if segment in ['=', '-']:
-                    # 区切り文字はそのまま保持
-                    continue
-                elif segment.strip():  # 空でないセグメント
-                    if morph_idx < len(morph_list):
-                        word_morphs.append(morph_list[morph_idx])
-                        morph_idx += 1
-            
-            # 単語内の形態素を区切り文字で結合
-            if word_morphs:
-                # 元の単語の区切り文字パターンを復元
-                morphs_with_delims = []
-                morph_pos = 0
-                
-                for segment in segments:
-                    if segment in ['=', '-']:
-                        morphs_with_delims.append(segment)
-                    elif segment.strip() and morph_pos < len(word_morphs):
-                        morphs_with_delims.append(word_morphs[morph_pos])
-                        morph_pos += 1
-                
-                result_parts.append(''.join(morphs_with_delims))
-        
-        return ' '.join(result_parts)
-    
-    def _align_words_for_doc(self, text_line: str, gloss_line: str) -> tuple:
-        """doc形式用に単語の開始位置を揃える"""
-        if not text_line or not gloss_line:
-            return text_line, gloss_line
-        
-        text_words = text_line.split()
-        gloss_words = gloss_line.split()
-        
-        # より正確な文字幅計算
-        def char_width(s):
-            import unicodedata
-            width = 0
-            for char in s:
-                # Unicode文字カテゴリーを使用してより正確に判定
-                if unicodedata.east_asian_width(char) in ('F', 'W'):
-                    # 全角文字（Full width, Wide）
-                    width += 2
-                elif unicodedata.east_asian_width(char) in ('H', 'Na', 'N'):
-                    # 半角文字（Half width, Narrow, Neutral）
-                    width += 1
-                else:
-                    # その他（A=Ambiguous）は環境依存だが、ここでは1として扱う
-                    width += 1
-            return width
-        
-        # 単語数が異なる場合は短い方に合わせる
-        min_len = min(len(text_words), len(gloss_words))
-        if len(text_words) != len(gloss_words):
-            print(f"警告: 単語数が一致しません (text: {len(text_words)}, gloss: {len(gloss_words)})")
-        
-        aligned_text_parts = []
-        aligned_gloss_parts = []
-        
-        for i in range(min_len):
-            text_word = text_words[i]
-            gloss_word = gloss_words[i]
-            
-            text_width = char_width(text_word)
-            gloss_width = char_width(gloss_word)
-            
-            # 両方の単語の最大幅を計算（最低2文字のスペースを確保）
-            max_width = max(text_width, gloss_width) + 2
-            
-            # パディングを追加
-            text_padding = max_width - text_width
-            gloss_padding = max_width - gloss_width
-            
-            if i < min_len - 1:  # 最後の単語でない場合
-                aligned_text_parts.append(text_word + ' ' * text_padding)
-                aligned_gloss_parts.append(gloss_word + ' ' * gloss_padding)
-            else:  # 最後の単語
-                aligned_text_parts.append(text_word)
-                aligned_gloss_parts.append(gloss_word)
-        
-        # 余った単語がある場合の処理
-        if len(text_words) > min_len:
-            remaining_text = ' '.join(text_words[min_len:])
-            aligned_text_parts.append(' ' + remaining_text)
-        
-        if len(gloss_words) > min_len:
-            remaining_gloss = ' '.join(gloss_words[min_len:])
-            aligned_gloss_parts.append(' ' + remaining_gloss)
-        
-        return ''.join(aligned_text_parts), ''.join(aligned_gloss_parts)
-    
-    def to_gb4e_format(self, sentences: List[Dict]) -> str:
-        """gb4e形式に変換（3段グロス：text, gloss, translation）"""
-        output = []
-        
-        # LaTeX用のヘッダーを追加
-        output.append("% UTF-8エンコーディング用設定")
-        output.append("% \\usepackage[utf8]{inputenc}")
-        output.append("% \\usepackage{CJKutf8}")
-        output.append("% \\usepackage{gb4e}")
-        output.append("% \\usepackage{tipa}")
-        output.append("")
-        
-        for i, sentence in enumerate(sentences, 1):
-            if not sentence['text']:
-                continue
-                
-            output.append("\\begin{exe}")
-            output.append("\\ex")
-            
-            # 1段目: text（IPAをtipaに変換）
-            text_tipa = self._convert_ipa_to_tipa(sentence['text'])
-            output.append(f"\\gll {text_tipa}\\\\")
-            
-            # 2段目: gloss（区切り文字に基づく整列）
-            if sentence['gloss']:
-                # gloss層をtext層の区切り文字に基づいて再配置
-                aligned_gloss = self._align_morphs_with_text(sentence['text'], sentence['gloss'])
-                output.append(f"     {aligned_gloss}\\\\")
-            else:
-                output.append("     \\\\")
-            
-            # 3段目: translation
-            if sentence['translation']:
-                output.append(f"\\glt {sentence['translation']}")
-            else:
-                output.append("\\glt")
-            
-            output.append("\\end{exe}")
-            output.append("")
-        
-        return "\n".join(output)
-    
     def _convert_tipa_back_to_ipa(self, text: str) -> str:
         """tipaコマンドを元のIPA文字に戻す"""
         if not text:
@@ -872,41 +674,280 @@ class EAFConverter:
         
         return result
     
+    def _align_morphs_with_text(self, text: str, morph: str) -> str:
+        """text層の区切り文字（=や-）に基づいてmorph層を再配置"""
+        if not text or not morph:
+            return morph
+        
+        morph_list = morph.split()
+        if not morph_list:
+            return morph
+        
+        text_words = text.split()
+        result_parts = []
+        morph_idx = 0
+        
+        for word in text_words:
+            segments = re.split(r'([=-])', word)
+            word_morphs = []
+            
+            for segment in segments:
+                if segment in ['=', '-']:
+                    continue
+                elif segment.strip():
+                    if morph_idx < len(morph_list):
+                        word_morphs.append(morph_list[morph_idx])
+                        morph_idx += 1
+            
+            if word_morphs:
+                morphs_with_delims = []
+                morph_pos = 0
+                
+                for segment in segments:
+                    if segment in ['=', '-']:
+                        morphs_with_delims.append(segment)
+                    elif segment.strip() and morph_pos < len(word_morphs):
+                        morphs_with_delims.append(word_morphs[morph_pos])
+                        morph_pos += 1
+                
+                result_parts.append(''.join(morphs_with_delims))
+        
+        return ' '.join(result_parts)
+    
+    def _align_words_for_doc(self, text_line: str, gloss_line: str) -> tuple:
+        """doc形式用に単語の開始位置を揃える"""
+        if not text_line or not gloss_line:
+            return text_line, gloss_line
+        
+        text_words = text_line.split()
+        gloss_words = gloss_line.split()
+        
+        def char_width(s):
+            import unicodedata
+            width = 0
+            for char in s:
+                if unicodedata.east_asian_width(char) in ('F', 'W'):
+                    width += 2
+                elif unicodedata.east_asian_width(char) in ('H', 'Na', 'N'):
+                    width += 1
+                else:
+                    width += 1
+            return width
+        
+        min_len = min(len(text_words), len(gloss_words))
+        if len(text_words) != len(gloss_words):
+            print(f"警告: 単語数が一致しません (text: {len(text_words)}, gloss: {len(gloss_words)})")
+        
+        aligned_text_parts = []
+        aligned_gloss_parts = []
+        
+        for i in range(min_len):
+            text_word = text_words[i]
+            gloss_word = gloss_words[i]
+            
+            text_width = char_width(text_word)
+            gloss_width = char_width(gloss_word)
+            
+            max_width = max(text_width, gloss_width) + 2
+            
+            text_padding = max_width - text_width
+            gloss_padding = max_width - gloss_width
+            
+            if i < min_len - 1:
+                aligned_text_parts.append(text_word + ' ' * text_padding)
+                aligned_gloss_parts.append(gloss_word + ' ' * gloss_padding)
+            else:
+                aligned_text_parts.append(text_word)
+                aligned_gloss_parts.append(gloss_word)
+        
+        if len(text_words) > min_len:
+            remaining_text = ' '.join(text_words[min_len:])
+            aligned_text_parts.append(' ' + remaining_text)
+        
+        if len(gloss_words) > min_len:
+            remaining_gloss = ' '.join(gloss_words[min_len:])
+            aligned_gloss_parts.append(' ' + remaining_gloss)
+        
+        return ''.join(aligned_text_parts), ''.join(aligned_gloss_parts)
+
+    def _convert_leipzig_glosses(self, gloss_text: str) -> str:
+        """Leipzig.styの規則に従って大文字英字の文法形態素記号を変換"""
+        if not gloss_text:
+            return gloss_text
+        
+        # バックスラッシュを二重にしてエスケープ
+        leipzig_mapping = {
+            'NOM': '\\\\textsc{nom}', 'ACC': '\\\\textsc{acc}', 'GEN': '\\\\textsc{gen}',
+            'DAT': '\\\\textsc{dat}', 'ABL': '\\\\textsc{abl}', 'LOC': '\\\\textsc{loc}',
+            'PST': '\\\\textsc{pst}', 'PRS': '\\\\textsc{prs}', 'FUT': '\\\\textsc{fut}',
+            'NPST': '\\\\textsc{npst}', 'PFV': '\\\\textsc{pfv}', 'IPFV': '\\\\textsc{ipfv}',
+            'SG': '\\\\textsc{sg}', 'PL': '\\\\textsc{pl}', 'DU': '\\\\textsc{du}',
+            'COP': '\\\\textsc{cop}', 'AUX': '\\\\textsc{aux}', 'NEG': '\\\\textsc{neg}',
+            'FOC': '\\\\textsc{foc}', 'TOP': '\\\\textsc{top}', 'EMPH': '\\\\textsc{emph}',
+            'HS': '\\\\textsc{hs}', 'EVID': '\\\\textsc{evid}', 'QUOT': '\\\\textsc{quot}',
+            'SFP': '\\\\textsc{sfp}', 'CAS': '\\\\textsc{cas}', 'PART': '\\\\textsc{part}',
+            'CAUS': '\\\\textsc{caus}', 'PASS': '\\\\textsc{pass}', 'REFL': '\\\\textsc{refl}',
+            'Q': '\\\\textsc{q}', 'CLF': '\\\\textsc{clf}', 'DET': '\\\\textsc{det}',
+            'DEF': '\\\\textsc{def}', 'INDEF': '\\\\textsc{indef}', 'COM': '\\\\textsc{com}'
+        }
+        
+        result = gloss_text
+        
+        # より慎重に変換：単語境界を厳密にチェック
+        for original, replacement in leipzig_mapping.items():
+            pattern = r'(?<![A-Za-z])' + re.escape(original) + r'(?![A-Za-z])'
+            result = re.sub(pattern, replacement, result)
+        
+        # 残った連続する大文字を自動変換（前後に英数字がない場合のみ）
+        def convert_unknown_caps(match):
+            caps_text = match.group(0)
+            return f'\\\\textsc{{{caps_text.lower()}}}'
+        
+        result = re.sub(r'(?<![A-Za-z])[A-Z]{2,}(?![A-Za-z])', convert_unknown_caps, result)
+        
+        return result
+    
+    def _convert_leipzig_back_to_plain(self, text: str) -> str:
+        """Leipzig.styのsmallcapsコマンドを元の小型大文字に戻す"""
+        if not text:
+            return text
+        
+        def convert_textsc_to_smallcaps(match):
+            content = match.group(1)
+            # 小型大文字に変換（実際にはUnicodeの小型大文字文字を使用）
+            smallcap_mapping = {
+                'nom': 'ɴᴏᴍ', 'acc': 'ᴀᴄᴄ', 'gen': 'ɢᴇɴ',
+                'dat': 'ᴅᴀᴛ', 'abl': 'ᴀʙʟ', 'loc': 'ʟᴏᴄ',
+                'pst': 'ᴘsᴛ', 'prs': 'ᴘʀs', 'fut': 'ꜰᴜᴛ',
+                'npst': 'ɴᴘsᴛ', 'pfv': 'ᴘꜰᴠ', 'ipfv': 'ɪᴘꜰᴠ',
+                'sg': 'sɢ', 'pl': 'ᴘʟ', 'du': 'ᴅᴜ',
+                'cop': 'ᴄᴏᴘ', 'aux': 'ᴀᴜx', 'neg': 'ɴᴇɢ',
+                'foc': 'ꜰᴏᴄ', 'top': 'ᴛᴏᴘ', 'emph': 'ᴇᴍᴘʜ',
+                'hs': 'ʜs', 'evid': 'ᴇᴠɪᴅ', 'quot': 'Qᴜᴏᴛ',
+                'sfp': 'sꜰᴘ', 'cas': 'ᴄᴀs', 'part': 'ᴘᴀʀᴛ',
+                'caus': 'ᴄᴀᴜs', 'pass': 'ᴘᴀss', 'refl': 'ʀᴇꜰʟ',
+                'q': 'Q', 'clf': 'ᴄʟꜰ', 'det': 'ᴅᴇᴛ',
+                'def': 'ᴅᴇꜰ', 'indef': 'ɪɴᴅᴇꜰ', 'com': 'ᴄᴏᴍ'
+            }
+            
+            return smallcap_mapping.get(content.lower(), content.upper())
+        
+        # \\textsc{...} を小型大文字に変換
+        result = re.sub(r'\\textsc\{([^}]+)\}', convert_textsc_to_smallcaps, text)
+        
+        # 通常の大文字（2文字以上）も小型大文字に変換
+        def convert_caps_to_smallcaps(match):
+            caps_text = match.group(0)
+            result_chars = []
+            for char in caps_text:
+                # 個別文字のマッピング
+                char_mapping = {
+                    'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ',
+                    'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ', 'K': 'ᴋ', 'L': 'ʟ',
+                    'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'Q', 'R': 'ʀ',
+                    'S': 's', 'T': 'ᴛ', 'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x',
+                    'Y': 'ʏ', 'Z': 'ᴢ'
+                }
+                result_chars.append(char_mapping.get(char, char))
+            return ''.join(result_chars)
+        
+        # 連続する大文字（2文字以上）を小型大文字に変換
+        result = re.sub(r'(?<![A-Za-z])[A-Z]{2,}(?![A-Za-z])', convert_caps_to_smallcaps, result)
+        
+        return result
+    
+    def to_gb4e_format(self, sentences: List[Dict]) -> str:
+        """gb4e形式に変換（Leipzig.sty対応、IPA→tipa変換付き）"""
+        output = []
+        
+        output.append("% UTF-8エンコーディング用設定")
+        output.append("% \\usepackage[utf8]{inputenc}")
+        output.append("% \\usepackage{CJKutf8}")
+        output.append("% \\usepackage{gb4e}")
+        output.append("% \\usepackage{tipa}")
+        output.append("% \\usepackage{leipzig}  % Leipzig.styパッケージ")
+        output.append("")
+        output.append("% Leipzig.styの使用により、大文字の文法記号が自動的に小文字のスモールキャップスに変換されます")
+        output.append("% IPA文字は自動的にtipaコマンドに変換されます")
+        output.append("")
+        
+        for i, sentence in enumerate(sentences, 1):
+            if not sentence['text']:
+                continue
+                
+            output.append("\\begin{exe}")
+            output.append("\\ex")
+            
+            # 1段目: text（IPAをtipaに変換）
+            text_tipa = self._convert_ipa_to_tipa(sentence['text'])
+            output.append(f"\\gll {text_tipa}\\\\")
+            
+            # 2段目: gloss（形態素整列 + Leipzig.sty変換）
+            if sentence['gloss']:
+                # text層の境界記号に基づいてgloss層を整列
+                aligned_gloss = self._align_morphs_with_text(sentence['text'], sentence['gloss'])
+                leipzig_gloss = self._convert_leipzig_glosses(aligned_gloss)
+                # 二重バックスラッシュを単一に修正
+                leipzig_gloss = leipzig_gloss.replace('\\\\', '\\')
+                output.append(f"     {leipzig_gloss}\\\\")
+            else:
+                output.append("     \\\\")
+            
+            # 3段目: translation（デバッグ情報付き）
+            if sentence.get('translation') and sentence['translation'].strip():
+                output.append(f"\\glt {sentence['translation']}")
+            else:
+                # 翻訳がない場合の情報表示
+                if not sentence.get('translation'):
+                    print(f"警告: 文 {i} に翻訳データがありません")
+                else:
+                    print(f"警告: 文 {i} の翻訳が空です: '{sentence['translation']}'")
+                output.append("\\glt")
+            
+            output.append("\\end{exe}")
+            output.append("")
+        
+        return "\n".join(output)
+    
     def to_doc_format(self, sentences: List[Dict], debug: bool = False) -> str:
-        """doc形式（gb4e形式をベースにコマンド類を除去、IPA文字を復元、インデント調整）"""
+        """doc形式（プレーンテキスト、IPA文字復元、小型大文字変換、インデント調整付き）"""
         output = []
         
         for i, sentence in enumerate(sentences, 1):
             if not sentence['text']:
                 continue
                 
-            # 例文番号
             output.append(f"({i})")
             
             # 1段目: text（IPAをtipaに変換してから元に戻す）
             text_tipa = self._convert_ipa_to_tipa(sentence['text'])
             text_original = self._convert_tipa_back_to_ipa(text_tipa)
             
-            # 2段目: gloss（区切り文字に基づく整列）
+            # 2段目: gloss（区切り文字に基づく整列 + Leipzig.sty変換後に小型大文字に戻す）
             if sentence['gloss']:
-                # gloss層をtext層の区切り文字に基づいて再配置
                 aligned_gloss = self._align_morphs_with_text(sentence['text'], sentence['gloss'])
+                leipzig_gloss = self._convert_leipzig_glosses(aligned_gloss)
+                # 二重バックスラッシュを単一に修正
+                leipzig_gloss = leipzig_gloss.replace('\\\\', '\\')
+                plain_gloss = self._convert_leipzig_back_to_plain(leipzig_gloss)
                 
                 if debug:
                     print(f"\n--- 例文 {i} のデバッグ情報 ---")
                     print(f"元のtext: '{sentence['text']}'")
                     print(f"元のgloss: '{sentence['gloss']}'")
                     print(f"整列後gloss: '{aligned_gloss}'")
+                    print(f"Leipzig変換後: '{leipzig_gloss}'")
                     print(f"最終text: '{text_original}'")
+                    print(f"最終gloss: '{plain_gloss}'")
                 
                 # 単語の開始位置を揃える
-                aligned_text, aligned_gloss_final = self._align_words_for_doc(text_original, aligned_gloss)
+                aligned_text, aligned_gloss_final = self._align_words_for_doc(text_original, plain_gloss)
                 
                 if debug:
                     print(f"位置調整後text: '{aligned_text}'")
                     print(f"位置調整後gloss: '{aligned_gloss_final}'")
                     print(f"text単語数: {len(text_original.split())}")
-                    print(f"gloss単語数: {len(aligned_gloss.split())}")
+                    print(f"gloss単語数: {len(plain_gloss.split())}")
                 
                 output.append(aligned_text)
                 output.append(aligned_gloss_final)
@@ -914,7 +955,7 @@ class EAFConverter:
                 output.append(text_original)
                 output.append("")
             
-            # 3段目: translation（シングルクォートも除去）
+            # 3段目: translation
             if sentence['translation']:
                 output.append(sentence['translation'])
             else:
@@ -923,6 +964,41 @@ class EAFConverter:
             output.append("")
         
         return "\n".join(output)
+
+# Leipzig.styテスト関数を改良
+def test_leipzig_conversion():
+    """Leipzig.sty変換機能のテスト"""
+    converter = EAFConverter("dummy.eaf")
+    
+    test_glosses = [
+        "FOC",
+        "GEN", 
+        "COM",
+        "PST",
+        "HS",
+        "昔=FOC 貧しい=GEN",
+        "UNKNOWN CUSTOM"
+    ]
+    
+    print("=== Leipzig.sty変換テスト ===")
+    print("入力 → 出力")
+    print("-" * 50)
+    
+    for gloss in test_glosses:
+        converted = converter._convert_leipzig_glosses(gloss)
+        print(f"'{gloss}' → '{converted}'")
+        
+        # バックスラッシュの確認
+        if '\\textsc' in converted:
+            print("  ✅ \\textsc が正しく含まれています")
+        elif 'extsc' in converted:
+            print("  ❌ \\t が欠けています！")
+    
+    print("\n" + "="*50)
+    print("変換規則:")
+    print("- 大文字の文法記号は \\textsc{小文字} に変換")
+    print("- 数字(1,2,3)はそのまま保持")
+    print("- 未定義の大文字記号も自動変換")
 
 # 診断関数
 def diagnose_eaf_file(eaf_filename, wav_filename=None):
@@ -940,22 +1016,111 @@ def diagnose_eaf_file(eaf_filename, wav_filename=None):
         print(f"\nティア: {tier_name}")
         print(f"  アノテーション数: {len(annotations)}")
         
-        # 最初の3つのアノテーションを表示
         for i, ann in enumerate(annotations[:3]):
             ann_type = ann.get('type', 'UNKNOWN')
             print(f"  [{i+1}] ({ann_type}) 時間: {ann['start_time']}-{ann['end_time']}")
-            content = ann['value'][:100] + '...' if len(ann['value']) > 100 else ann['value']
+            content = ann['value'][:200] + '...' if len(ann['value']) > 200 else ann['value']
             print(f"      内容: '{content}'")
+            # 境界記号の確認
+            if '=' in ann['value'] or '-' in ann['value']:
+                print(f"      *** 境界記号を検出: = や - が含まれています ***")
         
         if len(annotations) > 3:
             print(f"  ... (他 {len(annotations)-3} 個)")
 
-# 使用例
-def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_format='both', 
-                    debug=False, save_audio=True, audio_folder_name=None, 
+# 抽出内容確認用の関数を追加
+def debug_sentence_extraction(eaf_filename, tier_names=None):
+    """文抽出プロセスを詳しく確認"""
+    converter = EAFConverter(eaf_filename)
+    if not converter.parse_eaf():
+        return
+    
+    sentences = converter.extract_sentences(tier_names)
+    
+    print("\n=== 抽出された文の詳細確認 ===")
+    for i, sentence in enumerate(sentences[:3], 1):  # 最初の3文のみ
+        print(f"\n--- 文 {i} ---")
+        print(f"text: '{sentence['text']}'")
+        print(f"morph: '{sentence['morph']}'")
+        print(f"gloss: '{sentence['gloss']}'")
+        print(f"translation: '{sentence['translation']}'")
+        print(f"時間: {sentence['start_time']}ms - {sentence['end_time']}ms")
+        
+        # 境界記号の確認
+        if '=' in sentence['text'] or '-' in sentence['text']:
+            print("  *** text層に境界記号あり ***")
+        if '=' in sentence['gloss'] or '-' in sentence['gloss']:
+            print("  *** gloss層に境界記号あり ***")
+        if '=' in sentence['morph'] or '-' in sentence['morph']:
+            print("  *** morph層に境界記号あり ***")
+        
+        # 翻訳の詳細確認
+        if not sentence.get('translation'):
+            print("  ❌ translation キーが存在しません")
+        elif not sentence['translation']:
+            print("  ❌ translation が空文字列です")
+        elif not sentence['translation'].strip():
+            print("  ❌ translation が空白のみです")
+        else:
+            print(f"  ✅ translation OK: '{sentence['translation']}'")
+    
+    if len(sentences) > 3:
+        print(f"\n... (他 {len(sentences)-3} 文)")
+    
+    # ティア名の確認も追加
+    if tier_names:
+        print(f"\n=== 使用中のティア名 ===")
+        for key, value in tier_names.items():
+            print(f"{key}: '{value}'")
+    else:
+        print(f"\n=== デフォルトティア名使用 ===")
+        default_tiers = {
+            'text': 'text@KS',
+            'morph': 'morph@KS', 
+            'gloss': 'gloss@KS',
+            'translation': 'translation@KS'
+        }
+        for key, value in default_tiers.items():
+            print(f"{key}: '{value}'")
+
+# morph整列のテスト関数を追加
+def test_morph_alignment():
+    """morph整列機能のテスト"""
+    converter = EAFConverter("dummy.eaf")
+    
+    test_cases = [
+        {
+            'text': 'nkjaan=du kiban-kiban=nu',
+            'morph': '昔 FOC 貧しい 貧しい GEN'
+        },
+        {
+            'text': 'pZtu=tu ujaki=ti=nu',
+            'morph': '人 COM 豊かな QUOT GEN'
+        },
+        {
+            'text': 'a-tar=ca',
+            'morph': 'COP PST HS'
+        }
+    ]
+    
+    print("=== morph整列テスト ===")
+    for i, case in enumerate(test_cases, 1):
+        print(f"\n--- テストケース {i} ---")
+        print(f"入力text: '{case['text']}'")
+        print(f"入力morph: '{case['morph']}'")
+        
+        result = converter._align_morphs_with_text(case['text'], case['morph'])
+        print(f"整列結果: '{result}'")
+        
+        leipzig_result = converter._convert_leipzig_glosses(result)
+        print(f"Leipzig変換: '{leipzig_result}'")
+
+# 変換関数
+def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_format='both',
+                    debug=False, save_audio=True, audio_folder_name=None,
                     audio_padding_ms=100, create_zip=False):
     """
-    EAFファイルを変換する関数（音声切り出し機能付き）
+    EAFファイルを変換する関数（Leipzig.sty対応＋音声切り出し機能付き）
     
     Args:
         eaf_filename: EAFファイル名
@@ -972,7 +1137,6 @@ def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_fo
         変換結果の辞書
     """
     
-    # ファイルの存在確認
     if not os.path.exists(eaf_filename):
         print(f"ファイルが見つかりません: {eaf_filename}")
         print("\n現在のディレクトリのファイル:")
@@ -986,13 +1150,11 @@ def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_fo
         print("テキスト変換のみ実行します。")
         wav_filename = None
     
-    # 変換実行
     converter = EAFConverter(eaf_filename, wav_filename)
     
     if not converter.parse_eaf():
         return None
     
-    # 音声ファイルがある場合は読み込み
     if wav_filename:
         print("音声ファイルを読み込み中...")
         converter.load_audio()
@@ -1012,20 +1174,18 @@ def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_fo
         'audio_result': None
     }
     
-    # テキスト変換結果を表示・保存
     print("\n" + "="*70)
     
     if output_format in ['gb4e', 'both']:
-        print("GB4E形式:")
+        print("GB4E形式 (Leipzig.sty対応):")
         print("-" * 40)
         gb4e_content = converter.to_gb4e_format(sentences)
         print(gb4e_content)
         
-        # ファイルに保存（UTF-8 BOMなし）
-        gb4e_filename = f"{eaf_filename}_gb4e.tex"
+        gb4e_filename = f"{eaf_filename}_gb4e_leipzig.tex"
         with open(gb4e_filename, 'w', encoding='utf-8', newline='\n') as f:
             f.write(gb4e_content)
-        print(f"\n✅ GB4E形式を保存しました: {gb4e_filename}")
+        print(f"\n✅ GB4E形式(Leipzig.sty対応)を保存しました: {gb4e_filename}")
         result['gb4e_file'] = gb4e_filename
     
     if output_format in ['both']:
@@ -1034,10 +1194,9 @@ def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_fo
     if output_format in ['doc', 'both']:
         print("DOC形式:")
         print("-" * 40)
-        doc_content = converter.to_doc_format(sentences, debug=debug)
+        doc_content = converter.to_doc_format(sentences)
         print(doc_content)
         
-        # ファイルに保存
         doc_filename = f"{eaf_filename}_doc.txt"
         with open(doc_filename, 'w', encoding='utf-8') as f:
             f.write(doc_content)
@@ -1060,7 +1219,7 @@ def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_fo
     print(f"\n🎉 変換完了!")
     print(f"📊 抽出された文数: {len(sentences)}")
     if result['gb4e_file']:
-        print(f"📝 GB4E形式: {result['gb4e_file']}")
+        print(f"📝 GB4E形式（Leipzig.sty対応）: {result['gb4e_file']}")
     if result['doc_file']:
         print(f"📄 DOC形式: {result['doc_file']}")
     if result['audio_result']:
@@ -1070,15 +1229,16 @@ def convert_eaf_file(eaf_filename, wav_filename=None, tier_names=None, output_fo
     return result
 
 # 実行方法の説明
-print("=== EAFファイル変換ツール（修正版・音声切り出し機能付き） ===")
-print("機能:")
-print("- IPA文字を自動的にtipaコマンドに変換")
-print("- gloss層をtext層の区切り文字（=, -）に基づいて整列")
-print("- 文末記号（., ?, !）での自動文分割")
-print("- gb4e形式：LaTeX用の完全なフォーマット")
-print("- doc形式：gb4e形式をベースにコマンド類を除去したプレーンテキスト（インデント調整付き）")
-print("- 音声分割：文単位で音声ファイルを分割してデスクトップに保存")
-print("- ZIPファイル作成：音声ファイルをまとめてZIP圧縮")
+print("=== EAFファイル変換ツール（Leipzig.sty対応＋音声切り出し機能付き） ===")
+print("新機能:")
+print("✅ Leipzig.styパッケージに対応した文法記号の自動変換") 
+print("✅ NOM → \\textsc{nom}, PST → \\textsc{pst} など")
+print("✅ 未定義の大文字記号も自動でsmallcapsに変換")
+print("✅ IPA文字をtipaコマンドに自動変換（ɛ → \\textepsilon{}, ŋ → \\texteng{} など）")
+print("✅ 音声分割：文単位で音声ファイルを分割してデスクトップに保存")
+print("✅ ZIPファイル作成：音声ファイルをまとめてZIP圧縮")
+print("✅ 文末記号での自動文分割（時間情報付き）")
+print("✅ 形態素整列：text層の区切り文字に基づいてmorph/gloss層を再配置")
 print()
 
 if AUDIO_LIBRARY:
@@ -1089,17 +1249,35 @@ if AUDIO_LIBRARY:
     print("2. テキスト変換＋音声分割:")
     print("   result = convert_eaf_file('your_file.eaf', 'your_file.wav')")
     print()
-    print("3. 完全カスタム:")
+    print("3. カスタムティア名を指定:")
+    print("   tier_names = {")
+    print("       'text': 'text@Speaker1',      # 実際のtext層の名前")
+    print("       'morph': 'morph@Speaker1',    # 実際のmorph層の名前")
+    print("       'gloss': 'gloss@Speaker1',    # 実際のgloss層の名前")
+    print("       'translation': 'translation@Speaker1'  # 実際のtranslation層の名前")
+    print("   }")
     print("   result = convert_eaf_file('your_file.eaf', 'your_file.wav',")
+    print("                            tier_names=tier_names)")
+    print()
+    print("4. 完全カスタム（ティア名指定＋全オプション）:")
+    print("   tier_names = {'text': 'text@MyName', 'gloss': 'gloss@MyName', ...}")
+    print("   result = convert_eaf_file('your_file.eaf', 'your_file.wav',")
+    print("                            tier_names=tier_names,")
     print("                            output_format='both',")
     print("                            save_audio=True,")
     print("                            audio_folder_name='My_Audio_Project',")
     print("                            create_zip=True)")
     print()
-    print("4. デバッグモード:")
-    print("   result = convert_eaf_file('your_file.eaf', debug=True)")
+    print("5. Leipzig.sty変換テスト:")
+    print("   test_leipzig_conversion()")
     print()
-    print("5. 診断実行:")
+    print("6. morph整列テスト:")
+    print("   test_morph_alignment()")
+    print()
+    print("7. 文抽出デバッグ:")
+    print("   debug_sentence_extraction('your_file.eaf')")
+    print()
+    print("8. 診断実行（ティア名確認に便利）:")
     print("   diagnose_eaf_file('your_file.eaf', 'your_file.wav')")
 else:
     print("音声処理ライブラリが見つかりません。テキスト変換のみ利用可能です。")
@@ -1111,8 +1289,47 @@ else:
     print("1. 基本的な変換:")
     print("   result = convert_eaf_file('your_file.eaf')")
     print()
-    print("2. デバッグモード:")
-    print("   result = convert_eaf_file('your_file.eaf', debug=True)")
+    print("2. カスタムティア名を指定:")
+    print("   tier_names = {")
+    print("       'text': 'text@Speaker1',")
+    print("       'morph': 'morph@Speaker1',")
+    print("       'gloss': 'gloss@Speaker1',")
+    print("       'translation': 'translation@Speaker1'")
+    print("   }")
+    print("   result = convert_eaf_file('your_file.eaf', tier_names=tier_names)")
     print()
-    print("3. 診断実行:")
+    print("3. Leipzig.sty変換テスト:")
+    print("   test_leipzig_conversion()")
+    print()
+    print("4. morph整列テスト:")
+    print("   test_morph_alignment()")
+    print()
+    print("5. 文抽出デバッグ:")
+    print("   debug_sentence_extraction('your_file.eaf')")
+    print()
+    print("6. 診断実行（ティア名確認に便利）:")
     print("   diagnose_eaf_file('your_file.eaf')")
+
+print()
+print("💡 ティア名の確認方法:")
+print("EAFファイルのティア名を確認するには:")
+print("   diagnose_eaf_file('your_file.eaf')")
+print("これで利用可能な全ティア名が表示されます。")
+print()
+print("📝 よくあるティア名のパターン:")
+print("- text@話者名 (例: text@KS, text@Speaker1)")
+print("- morph@話者名 (例: morph@KS, morph@Speaker1)")
+print("- gloss@話者名 (例: gloss@KS, gloss@Speaker1)")
+print("- translation@話者名 (例: translation@KS, translation@Speaker1)")
+print()
+print("📝 LaTeX文書での使用方法:")
+print("\\documentclass{article}")
+print("\\usepackage[utf8]{inputenc}")
+print("\\usepackage{CJKutf8}")
+print("\\usepackage{gb4e}")
+print("\\usepackage{tipa}")
+print("\\usepackage{leipzig}  % Leipzig.styパッケージ")
+print()
+print("\\begin{document}")
+print("\\input{your_file.eaf_gb4e_leipzig.tex}")
+print("\\end{document}")
