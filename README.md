@@ -68,6 +68,4 @@ tier_names = {
         'trans': 'x',
         'text': 'x'
     }
-
-#その後、ファイル名を指定（xを修正）
 convert_eaf_simple('x.eaf', 'x.wav', tier_names = tier_names)
