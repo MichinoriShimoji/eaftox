@@ -29,19 +29,15 @@ pip install librosa soundfile pydub numpy
 from eaf_converter3 import convert_eaf_file
 
 #読み込み後、実行：eafファイル名、eafのtier名を指定（以下の'x'を修正）
-convert_eaf_file(
-    eaf_filename='x.eaf',
-    wav_filename='x.wav',
-    output_format='both',
-    save_audio=True,
-    create_zip=True,
-    tier_names={
-        'text': 'x',
-        'morph': 'x',
-        'gloss': 'x',
-        'translation': 'x'
-    }
-)
+tier_names = {
+       'text': 'x',      # 実際のtext層の名前
+       'morph': 'x',    # 実際のmorph層の名前
+       'gloss': 'x',    # 実際のgloss層の名前
+       'translation': 'x'  # 実際のtranslation層の名前
+   }
+convert_eaf_file('x.eaf', 'x.wav',
+                            tier_names=tier_names)
+
 
 #5層構造eaf（text0 (形態素境界なし), text1（基底構造で形態素境界あり）, morph, gloss, trans）から4層構造IGTへ
 from eaf_converter4 import convert_eaf_file 
