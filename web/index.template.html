@@ -42,23 +42,21 @@
 
       <section id="mapping" class="panel">
         <div class="section-heading"><div><span class="section-number">02</span><h2>構造を確認</h2><span id="mapping-count" class="count-badge" hidden></span></div><button id="add-speaker" class="text-button" disabled>＋ 話者を追加</button></div>
-        <div id="mapping-empty" class="empty-state"><span class="empty-diagram" aria-hidden="true">▤ ─┬─ ▤<br>　　└─ ▤</span><p>EAFを選ぶと、ティアの親子関係が図で表示されます。</p><small>自動判定された役割を確認し、カード上で修正できます。</small></div>
+        <div id="mapping-empty" class="empty-state"><span class="empty-chain" aria-hidden="true">text0 — text — morph — gloss — trans</span><p>EAFを選ぶと、使うティアがチェインで表示されます。</p><small>不要なティアはクリックで外せます。</small></div>
         <div id="mapping-content" hidden>
-          <div id="mapping-notice" class="subtle-notice"></div>
+          <div id="mapping-notice" class="subtle-notice" hidden></div>
           <div id="speaker-tabs" class="speaker-tabs" role="group" aria-label="構造を確認する話者"></div>
-          <div id="speakers"></div>
-          <div class="diagram-heading"><div><h3>ティアの親子関係</h3><p id="diagram-help">線でつながったカードが親子です。役割はカード内で変更できます。</p></div><label class="diagram-filter"><input type="checkbox" id="show-all-tiers">すべてのティアを表示</label></div>
-          <div class="diagram-legend"><span><i class="legend-used"></i>この話者で使用</span><span><i class="legend-unused"></i>この話者では未使用</span><span class="legend-edge">⟶ EAFの親子関係</span></div>
-          <div id="tier-diagram" class="tier-diagram" tabindex="0" role="region" aria-label="ティアの依存関係図" aria-describedby="diagram-help diagram-caption"></div>
-          <div class="diagram-footer"><p id="diagram-caption"></p><div class="diagram-scroll"><button id="diagram-left" type="button" aria-label="図を左へスクロール">←</button><span>スクロールして全体を確認</span><button id="diagram-right" type="button" aria-label="図を右へスクロール">→</button></div></div>
-          <details id="mapping-details" class="tier-details"><summary>役割ごとの対応を詳しく調整</summary><div id="role-fields" class="mapping-grid"></div></details>
+          <div class="chain-heading"><p>出力しないティアをクリックして外してください。</p><span id="chain-count" aria-live="polite"></span></div>
+          <div id="tier-chain" class="tier-chain" role="group" aria-label="使うティアのチェイン"></div>
+          <div id="removed-row" class="removed-row" hidden><span>外したティア</span><div id="removed-tiers"></div><small>クリックで戻す</small></div>
+          <details id="mapping-details" class="tier-details"><summary>対応を調整</summary><div id="speakers"></div><div id="role-fields" class="mapping-grid"></div></details>
           <details class="tier-details"><summary>検出したティアの一覧 <span id="tier-count"></span></summary><div class="table-scroll"><table><thead><tr><th>ティア</th><th>親ティア</th><th>話者</th><th>件数</th><th>内容の例</th></tr></thead><tbody id="tier-table"></tbody></table></div></details>
         </div>
       </section>
 
       <section id="export" class="panel">
         <div class="section-heading"><div><span class="section-number">03</span><h2>確認して、書き出す</h2></div><span id="sentence-count" class="section-caption"></span></div>
-        <div class="export-layout"><div class="preview-column"><div class="preview-heading"><span class="eyebrow">PREVIEW</span><span>先頭3文</span></div><div id="preview" class="preview"><p class="preview-empty">ティアを選ぶと、出力する例文を確認できます。</p></div></div><div class="settings-column"><label class="field"><span>GB4Eスタイル</span><select id="gb4e-style"><option>標準版</option><option>行間調整版</option><option>最小限版</option></select></label><label class="check-field"><input type="checkbox" id="include-audio" checked><span>文ごとの音声を含める<small>WAVは元の音質・チャンネル数を保持</small></span></label><label class="field padding-field"><span>音声の前後余白 <output id="padding-value">100 ms</output></span><input id="padding" type="range" min="0" max="500" step="50" value="100"><span class="range-labels"><span>0 ms</span><span>500 ms</span></span></label><p class="settings-note">ZIPには .tex・.txt と分割WAVをまとめます。品詞の行はテキスト形式に出力します。</p></div></div>
+        <div class="export-layout"><div class="preview-column"><div class="preview-heading"><span class="eyebrow">PREVIEW</span><span>先頭3文</span></div><div id="preview" class="preview"><p class="preview-empty">ティアを選ぶと、出力する例文を確認できます。</p></div></div><div class="settings-column"><label class="field"><span>GB4Eスタイル</span><select id="gb4e-style"><option>標準版</option><option>行間調整版</option><option>最小限版</option></select></label><label class="check-field"><input type="checkbox" id="include-audio" checked><span>文ごとの音声を含める<small>WAVは元の音質・チャンネル数を保持</small></span></label><label class="field padding-field"><span>音声の前後余白 <output id="padding-value">100 ms</output></span><input id="padding" type="range" min="0" max="500" step="50" value="100"><span class="range-labels"><span>0 ms</span><span>500 ms</span></span></label><p class="settings-note">チェインに残した行を .tex・.txt に出力し、分割WAVとZIPにまとめます。</p></div></div>
         <div class="export-footer"><div class="export-hint" id="export-hint">まずEAFファイルを選択してください。</div><button id="convert" class="button primary" disabled>ファイルを作成 <span aria-hidden="true">→</span></button><button id="cancel" class="button secondary" hidden>中止</button></div>
         <div id="progress-region" hidden><div class="progress-label"><span id="progress-text">準備中…</span><span id="progress-percent">0%</span></div><progress id="progress" value="0" max="1"></progress></div>
         <div id="results" class="results" hidden><div><span class="success-icon" aria-hidden="true">✓</span><div><strong>書き出しの準備ができました</strong><p id="result-summary"></p></div></div><div class="download-actions"><a id="download-zip" class="button primary" download>まとめてダウンロード <span>↓</span></a><a id="download-tex" class="button secondary" download>GB4E .tex</a><a id="download-txt" class="button secondary" download>テキスト .txt</a></div></div>

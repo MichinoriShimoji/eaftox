@@ -125,41 +125,20 @@
     });
   }
 
-  // Keep the EAF hierarchy separate from output roles: roles never create edges.
-  function buildTierForest(info) {
-    const nodes = new Map(info.map(tier => [tier.id, { tier, children: [], warning: "" }]));
-    const parents = new Map();
-    for (const tier of info) {
-      if (tier.parent && nodes.has(tier.parent)) parents.set(tier.id, tier.parent);
-      else if (tier.parent) nodes.get(tier.id).warning = `親ティア「${tier.parent}」が見つかりません。`;
-    }
-    const visited = new Set();
-    for (const tier of info) {
-      const path = [], positions = new Map();
-      let id = tier.id;
-      while (id && !visited.has(id)) {
-        if (positions.has(id)) {
-          for (const cyclic of path.slice(positions.get(id))) nodes.get(cyclic).warning = "親子関係が循環しています。図では循環する接続を1本省略しています。";
-          parents.delete(path.at(-1));
-          break;
-        }
-        positions.set(id, path.length); path.push(id); id = parents.get(id);
-      }
-      for (const seen of path) visited.add(seen);
-    }
-    const roots = [];
-    for (const [id, node] of nodes) {
-      const parent = parents.get(id);
-      if (parent) nodes.get(parent).children.push(node);
-      else roots.push(node);
-    }
-    return roots;
+  const OUTPUT_ROLES = ["text0", "text", "morph", "gloss", "pos", "trans"];
+  function selectedRoles(speaker) {
+    const excluded = new Set(speaker.excludedRoles || []);
+    return OUTPUT_ROLES.filter(role => speaker.tiers[role] && !excluded.has(role)
+      && !(role === "text0" && speaker.mode !== "4層")
+      && !(role === "morph" && speaker.mode === "シンプル3層"));
   }
 
   function extractSentences(eaf, speakers) {
     const sentences = [];
     for (const [speakerIndex, speaker] of speakers.entries()) {
       const { mode, tiers } = speaker;
+      const outputRoles = Array.isArray(speaker.excludedRoles) ? selectedRoles(speaker) : null;
+      if (outputRoles && !outputRoles.length) continue;
       const baseRole = mode === "4層" && eaf.tiers.has(tiers.text0) ? "text0" : "text";
       const base = eaf.tiers.get(tiers[baseRole]);
       if (!base) throw new Error(`話者${speakerIndex + 1}の ${baseRole} ティアを選択してください。`);
@@ -168,6 +147,7 @@
         const start = ann.start_time, end = ann.end_time;
         const sent = { start_time: start, end_time: end, speaker: speaker.name || `話者${speakerIndex + 1}`, mode,
           text0: null, text: null, morph: null, gloss: null, pos: null, trans: null };
+        if (outputRoles) sent.outputRoles = outputRoles;
         sent[baseRole] = ann.value;
         const excluded = new Set();
         for (const gloss of eaf.tiers.get(tiers.gloss) || []) {
@@ -305,9 +285,55 @@
   const leipzig = text => text.replace(/(?<![A-Za-z0-9])[A-Z]{2,}[0-9]*(?![A-Za-z])/g, match => `\\textsc{${match.toLowerCase()}}`);
   const latexEscape = text => (text || "").replace(/[\\{}%&#_$^~]/g, ch => ({"\\":"\\textbackslash{}", "^":"\\^{}", "~":"\\~{}"}[ch] || "\\" + ch));
 
+  // Retain source text for timing and gloss alignment even when its row is hidden.
+  function outputRows(sent) {
+    const chosen = sent.outputRoles || OUTPUT_ROLES.filter(role => role !== "morph" && !(role === "text0" && sent.mode !== "4層"));
+    const base = sent.text || sent.text0;
+    return chosen.filter(role => sent[role]).map(role => ({ role, text: role === "trans" ? sent[role]
+      : normalize(["gloss", "pos"].includes(role) ? alignMorphs(base, sent[role]) : sent[role]) }));
+  }
+
+  function selectedGb4e(sent, minimal, spacing, label) {
+    const rows = outputRows(sent), lines = rows.filter(row => row.role !== "trans");
+    if (!rows.length) return [];
+    const output = minimal ? ["\\begin{exe}\\ex" + (label ? " " + label : "")] : ["\\begin{exe}", "\\ex", ...(label ? [label] : [])];
+    const format = row => ipaToTipa(["gloss", "pos"].includes(row.role) ? leipzig(row.text) : row.text);
+    const aligned = lines.length === 2 || lines.length === 3;
+    if (aligned) {
+      const indent = minimal ? "" : lines.length === 3 ? "      " : "     ";
+      output.push(`\\${lines.length === 3 ? "glll" : "gll"} ${format(lines[0])}\\\\`);
+      for (const row of lines.slice(1)) output.push(indent + format(row) + "\\\\");
+    } else if (lines.length > 3) {
+      // gb4e provides two- and three-line glosses; a tabular inside the example
+      // keeps an arbitrary selection of four or more rows aligned by word.
+      const words = lines.map(row => row.text.trim().split(/\s+/));
+      const columns = Math.max(...words.map(row => row.length));
+      output.push(`\\begin{tabular}[t]{@{}${"l".repeat(columns)}@{}}`);
+      lines.forEach((row, index) => {
+        const cells = words[index].map(text => format({ ...row, text }));
+        while (cells.length < columns) cells.push("");
+        output.push(cells.join(" & ") + "\\\\");
+      });
+      output.push("\\end{tabular}");
+    } else if (lines.length) output.push(format(lines[0]));
+    const translation = rows.find(row => row.role === "trans");
+    if (translation) {
+      const text = latexEscape(translation.text);
+      if (aligned) output.push(minimal || spacing ? `\\glt \`${text}'${spacing && !minimal ? "%" : ""}` : `\\glt ${text}`);
+      else output.push((lines.length ? "\\par " : "") + text);
+    }
+    output.push("\\end{exe}", "");
+    return output;
+  }
+
   function toText(sentences) {
     const output = [], showSpeaker = new Set(sentences.map(s => s.speaker).filter(Boolean)).size > 1;
     sentences.forEach((sent, index) => {
+      if (sent.outputRoles) {
+        const rows = outputRows(sent);
+        if (rows.length) output.push(`(${index + 1})${showSpeaker && sent.speaker ? ` [${sent.speaker}]` : ""}`, ...rows.map(row => row.text), "");
+        return;
+      }
       if (!sent.text0 && !sent.text) return;
       output.push(`(${index + 1})${showSpeaker && sent.speaker ? ` [${sent.speaker}]` : ""}`);
       if (sent.mode === "4層" && sent.text0) output.push(normalize(sent.text0));
@@ -330,6 +356,7 @@
     for (const sent of sentences) {
       if (!sent.text0 && !sent.text) continue;
       const label = showSpeaker && sent.speaker ? `\\textbf{[${latexEscape(sent.speaker)}]}` : "";
+      if (sent.outputRoles) { output.push(...selectedGb4e(sent, minimal, spacing, label)); continue; }
       if (minimal) output.push("\\begin{exe}\\ex" + (label ? " " + label : ""));
       else { output.push("\\begin{exe}", "\\ex"); if (label) output.push(label); }
       const four = sent.mode === "4層", indent = minimal ? "" : four ? "      " : "     ";
@@ -467,5 +494,5 @@
   const safeName = value => (value || "").normalize("NFC").replace(/[^\p{L}\p{N}_\s-]/gu, "").trim().replace(/\s+/g, "_").slice(0, 50);
   function audioFilename(sent, index) { return `audio_segments/${String(index + 1).padStart(3, "0")}_${safeName(sent.speaker)}_${safeName((sent.text0 || sent.text || "").slice(0, 30)) || "sentence"}.wav`; }
 
-  return { VERSION, MODES, NONE, parseEaf, resolveTiers, guessSpeakers, buildTierForest, extractSentences, alignMorphs, normalize, ipaToTipa, toText, toGb4e, openWav, sliceWav, sliceDecodedAudio, segmentBounds, makeZip, crc32, audioFilename };
+  return { VERSION, MODES, NONE, parseEaf, resolveTiers, guessSpeakers, selectedRoles, outputRows, extractSentences, alignMorphs, normalize, ipaToTipa, toText, toGb4e, openWav, sliceWav, sliceDecodedAudio, segmentBounds, makeZip, crc32, audioFilename };
 });
