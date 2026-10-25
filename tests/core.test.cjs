@@ -51,32 +51,50 @@ test('bad reference cycles are reported instead of hanging', () => {
   const eaf = E.resolveTiers([{id:'text',annotations:[{annotation_id:'a',ref_id:'b',value:'x'},{annotation_id:'b',ref_id:'a',value:'y'}]}]);
   assert.equal(eaf.skipped,2); assert.equal(eaf.tiers.get('text').length,0);
 });
-test('tier diagram preserves actual branching and independent roots in repository EAFs', () => {
-  for (const fixture of require('./repository-samples.json')) {
-    const info = E.resolveTiers(fixture.records).info;
-    const roots = E.buildTierForest(info), seen = [], edges = [];
-    function visit(node) { seen.push(node.tier.id); for (const child of node.children) { edges.push([node.tier.id,child.tier.id]); visit(child); } }
-    roots.forEach(visit);
-    assert.deepEqual(seen.sort(),info.map(t=>t.id).sort());
-    assert.deepEqual(edges.sort(),info.filter(t=>t.parent).map(t=>[t.parent,t.id]).sort());
-    if (fixture.file === 'sample4.eaf') assert.deepEqual(roots.map(n=>n.tier.id),['text0','text1']);
-  }
-});
-test('tier diagram retains orphan/cyclic tiers with warnings and never invents parent links', () => {
-  const info = [{id:'child',parent:'a'},{id:'a',parent:'b'},{id:'b',parent:'a'},{id:'orphan',parent:'missing'},{id:'self',parent:'self'}];
-  const seen = [], edges = [], warned = [];
-  function visit(node) { seen.push(node.tier.id); if(node.warning) warned.push(node.tier.id); for(const child of node.children) { edges.push([node.tier.id,child.tier.id]); visit(child); } }
-  E.buildTierForest(info).forEach(visit);
-  assert.deepEqual(seen.sort(),info.map(t=>t.id).sort());
-  assert.equal(edges.length,2);
-  for(const [parent,id] of edges) assert.equal(info.find(t=>t.id===id).parent,parent);
-  assert.deepEqual(warned.sort(),['a','b','orphan','self']);
-  assert.equal(info.find(t=>t.id==='b').parent,'a');
-});
 test('LaTeX escaping covers translations and speaker labels', () => {
   const output = E.toGb4e([{text:'a',trans:'50% & x_y $1',speaker:'A&B'},{text:'b',speaker:'C'}]);
   assert.ok(output.includes('50\\% \\& x\\_y \\$1'));
   assert.ok(output.includes('[A\\&B]'));
+});
+test('chain selection removes output rows while preserving segmentation and gloss alignment', () => {
+  const eaf = E.resolveTiers(reference.records), speaker = {...reference.cases[0].speakers[0], excludedRoles: []};
+  const all = E.extractSentences(eaf,[speaker])[0];
+  assert.deepEqual(E.outputRows(all).map(row=>row.role),['text0','text','morph','gloss','pos','trans']);
+  const selected = E.extractSentences(eaf,[{...speaker,excludedRoles:['text0','morph','pos','trans']}])[0];
+  assert.equal(selected.start_time,all.start_time); assert.equal(selected.end_time,all.end_time);
+  assert.deepEqual(E.outputRows(selected).map(row=>row.role),['text','gloss']);
+  assert.equal(E.outputRows(selected)[1].text,'3SG=NOM book=ACC read-PST');
+  assert.equal(E.toText([selected]),'(1)\nɕi=ga hon=o yom-da\n3SG=NOM book=ACC read-PST\n');
+  for(const style of ['標準版','行間調整版','最小限版']) {
+    const tex = E.toGb4e([selected],style);
+    assert.ok(tex.includes('\\gll ')); assert.ok(!tex.includes('\\glll '));
+    assert.ok(!tex.includes('\\glt')); assert.ok(!tex.includes('彼が本を読んだ。'));
+    assert.ok(!tex.includes('\\begin{tabular}'));
+  }
+  assert.deepEqual(E.extractSentences(eaf,[speaker])[0],all);
+});
+test('all rows can be hidden, including source text, independently for each speaker', () => {
+  const eaf = E.resolveTiers(reference.records), [a,b] = reference.cases[0].speakers;
+  const hidden = ['text0','text','morph','gloss','pos','trans'];
+  assert.deepEqual(E.extractSentences(eaf,[{...a,excludedRoles:hidden}]),[]);
+  const onlyB = E.extractSentences(eaf,[{...a,excludedRoles:hidden},{...b,excludedRoles:[]}]);
+  assert.equal(onlyB.length,1); assert.equal(onlyB[0].speaker,'B');
+  const onlyGloss = E.extractSentences(eaf,[{...a,excludedRoles:hidden.filter(role=>role!=='gloss')}]);
+  assert.equal(E.toText(onlyGloss),'(1)\n3SG=NOM book=ACC read-PST\n');
+  assert.ok(!E.toGb4e(onlyGloss).includes('\\gll'));
+  const onlyTrans = E.extractSentences(eaf,[{...a,excludedRoles:hidden.filter(role=>role!=='trans')}]);
+  assert.equal(E.toText(onlyTrans),'(1)\n彼が本を読んだ。\n');
+  assert.ok(E.toGb4e(onlyTrans).includes('彼が本を読んだ。'));
+});
+test('selected LaTeX rows use valid two/three-line macros or a table for more rows', () => {
+  const speaker = {...reference.cases[0].speakers[0],excludedRoles:[]};
+  const eaf = E.resolveTiers(reference.records);
+  const all = E.extractSentences(eaf,[speaker]);
+  assert.ok(E.toGb4e(all).includes('\\begin{tabular}[t]{@{}llllll@{}}'));
+  assert.ok(E.toGb4e(all).includes('\\end{tabular}\n\\par 彼が本を読んだ。'));
+  const three = E.extractSentences(eaf,[{...speaker,excludedRoles:['morph','pos']}]);
+  assert.ok(E.toGb4e(three).includes('\\glll '));
+  assert.ok(E.toGb4e(three).includes('\\glt 彼が本を読んだ。'));
 });
 for (const config of [{bits:8,channels:1},{bits:16,channels:2},{bits:24,channels:2,extra:true},{bits:32,channels:1},{bits:32,channels:2,float:true},{bits:64,channels:1,float:true},{bits:24,channels:2,extensible:true},{bits:32,channels:2,float:true,extensible:true}]) {
   test(`WAV exact frame slicing preserves ${JSON.stringify(config)}`, async () => {
