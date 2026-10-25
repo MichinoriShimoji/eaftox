@@ -35,3 +35,22 @@
 .empty-chain{display:block;font:15px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;color:#a0ae96;margin-bottom:16px;overflow-wrap:anywhere}
 @media(max-width:1120px){.speaker-settings{grid-template-columns:145px minmax(0,1fr);gap:12px}.speaker-settings .remove-speaker{grid-column:1/-1;justify-self:end;padding:0}}
 @media(max-width:540px){.speaker-settings{grid-template-columns:minmax(0,1fr)}.speaker-settings .speaker-name,.speaker-settings .mode-select{font-size:16px}.speaker-tabs{margin-top:4px}.speaker-tab{padding:8px 11px;font-size:13px}.chain-heading{display:block}.chain-heading>span{display:block;margin-top:7px}.tier-chain{gap:5px;padding:12px 0}.chain-tier{font-size:17px;gap:5px}.chain-link{font-size:15px}.chain-step{gap:5px}.removed-row small{width:100%}.empty-chain{font-size:13px}}
+
+
+/* Keep tier choices and their output visible side by side. */
+.mapping-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start;margin-bottom:22px}
+.mapping-layout>.panel{margin-bottom:0;min-width:0}
+.mapping-preview{position:sticky;top:102px}
+.mapping-preview .preview{max-height:560px;overflow:auto}
+.mapping-preview .section-heading{gap:10px}
+.mapping-preview .section-caption{white-space:nowrap}
+.mapping-layout .chain-heading{display:block}
+.mapping-layout .chain-heading>span{display:block;margin-top:7px}
+.mapping-layout .speaker-settings{grid-template-columns:minmax(0,1fr)}
+.mapping-layout .speaker-settings .remove-speaker{justify-self:end;padding:0}
+.mapping-layout .mapping-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.export-settings{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.export-settings .check-field,.export-settings .padding-field{margin-top:0}
+.export-settings .check-field{padding-top:4px}
+@media(max-width:1000px){.mapping-layout{grid-template-columns:minmax(0,1fr)}.mapping-preview{position:static}.mapping-preview .preview{max-height:none}.export-settings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.mapping-layout{gap:17px;margin-bottom:17px}.mapping-layout .mapping-grid,.export-settings{grid-template-columns:minmax(0,1fr)}.mapping-preview .section-caption{display:block}.export-settings{gap:18px}}
