@@ -6,6 +6,8 @@ authors:
   - family-names: Shimoji
     given-names: Michinori
 version: 1.0.0
+date-released: '2026-10-25'
+doi: 10.5281/zenodo.23644511
 license: MIT
 url: "https://michinorishimoji.github.io/eaftox/"
 repository-code: "https://github.com/MichinoriShimoji/eaftox"

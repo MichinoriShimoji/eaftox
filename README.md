@@ -4,6 +4,8 @@
 
 **[eaftoxを開く](https://MichinoriShimoji.github.io/eaftox/)**
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23644510.svg)](https://doi.org/10.5281/zenodo.23644510)
+
 EAF解析・例文変換・音声分割・ZIP作成を、各自のPCのブラウザ内で行います。EAFや音声はサーバーに送信しません。アカウントやPythonのインストールも不要です。
 
 1. EAFファイルと、必要ならWAVまたはMP3を選択します。
@@ -42,6 +44,13 @@ node --test tests/core.test.cjs
 ### 引用とライセンス
 
 著者は **Michinori Shimoji** です。引用情報は [`CITATION.cff`](CITATION.cff) に収録しています。
+
+> Shimoji, M. (2026). *eaftox: Browser-based EAF converter with audio segmentation* (v1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23644511
+
+- v1.0.0のDOI（この版を引用する場合）：[10.5281/zenodo.23644511](https://doi.org/10.5281/zenodo.23644511)
+- 全バージョン共通のDOI（最新版への入口）：[10.5281/zenodo.23644510](https://doi.org/10.5281/zenodo.23644510)
+- [リリースとオフライン用HTML](https://github.com/MichinoriShimoji/eaftox/releases/tag/v1.0.0)
+
 ソフトウェアのコードと付属文書は [MITライセンス](LICENSE) で公開しています。オフライン用HTMLにもライセンス本文を含めています。
 
 ### Hugging Face版の移転案内
