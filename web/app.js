@@ -280,14 +280,15 @@
     const url = URL.createObjectURL(new Blob([pristineHtml], { type: "text/html;charset=utf-8" })), link = element("a");
     link.href = url; link.download = "eaftox.html"; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
   });
-  const sampleEaf = `<?xml version="1.0" encoding="UTF-8"?><ANNOTATION_DOCUMENT><HEADER/><TIME_ORDER><TIME_SLOT TIME_SLOT_ID="t1" TIME_VALUE="200"/><TIME_SLOT TIME_SLOT_ID="t2" TIME_VALUE="1500"/><TIME_SLOT TIME_SLOT_ID="t3" TIME_VALUE="1900"/><TIME_SLOT TIME_SLOT_ID="t4" TIME_VALUE="3400"/><TIME_SLOT TIME_SLOT_ID="t5" TIME_VALUE="3800"/><TIME_SLOT TIME_SLOT_ID="t6" TIME_VALUE="4900"/></TIME_ORDER><TIER TIER_ID="text" PARTICIPANT="話者A"><ANNOTATION><ALIGNABLE_ANNOTATION ANNOTATION_ID="a1" TIME_SLOT_REF1="t1" TIME_SLOT_REF2="t2"><ANNOTATION_VALUE>taroo=ga hon=o yom-da.</ANNOTATION_VALUE></ALIGNABLE_ANNOTATION></ANNOTATION><ANNOTATION><ALIGNABLE_ANNOTATION ANNOTATION_ID="a2" TIME_SLOT_REF1="t3" TIME_SLOT_REF2="t4"><ANNOTATION_VALUE>hana=ga sak-u.</ANNOTATION_VALUE></ALIGNABLE_ANNOTATION></ANNOTATION><ANNOTATION><ALIGNABLE_ANNOTATION ANNOTATION_ID="a3" TIME_SLOT_REF1="t5" TIME_SLOT_REF2="t6"><ANNOTATION_VALUE>ame=ga hur-u.</ANNOTATION_VALUE></ALIGNABLE_ANNOTATION></ANNOTATION></TIER><TIER TIER_ID="gloss" PARENT_REF="text"><ANNOTATION><REF_ANNOTATION ANNOTATION_ID="g1" ANNOTATION_REF="a1"><ANNOTATION_VALUE>Taro NOM book ACC read PST</ANNOTATION_VALUE></REF_ANNOTATION></ANNOTATION><ANNOTATION><REF_ANNOTATION ANNOTATION_ID="g2" ANNOTATION_REF="a2"><ANNOTATION_VALUE>flower NOM bloom NPST</ANNOTATION_VALUE></REF_ANNOTATION></ANNOTATION><ANNOTATION><REF_ANNOTATION ANNOTATION_ID="g3" ANNOTATION_REF="a3"><ANNOTATION_VALUE>rain NOM fall NPST</ANNOTATION_VALUE></REF_ANNOTATION></ANNOTATION></TIER><TIER TIER_ID="translation" PARENT_REF="text"><ANNOTATION><REF_ANNOTATION ANNOTATION_ID="f1" ANNOTATION_REF="a1"><ANNOTATION_VALUE>太郎が本を読んだ。</ANNOTATION_VALUE></REF_ANNOTATION></ANNOTATION><ANNOTATION><REF_ANNOTATION ANNOTATION_ID="f2" ANNOTATION_REF="a2"><ANNOTATION_VALUE>花が咲く。</ANNOTATION_VALUE></REF_ANNOTATION></ANNOTATION><ANNOTATION><REF_ANNOTATION ANNOTATION_ID="f3" ANNOTATION_REF="a3"><ANNOTATION_VALUE>雨が降る。</ANNOTATION_VALUE></REF_ANNOTATION></ANNOTATION></TIER></ANNOTATION_DOCUMENT>`;
+  const sampleFiles = /* SAMPLE FILES */ null;
   $("load-demo").addEventListener("click", async () => {
     if (state.busy) return;
-    const pcm = new Int16Array(16000 * 5.2);
-    for (let i = 0; i < pcm.length; i++) pcm[i] = Math.round(Math.sin(i * Math.PI * 2 * 220 / 16000) * 1800 * (0.5 - 0.5 * Math.cos(i / 3200)));
-    const header = new ArrayBuffer(44), h = new DataView(header), ascii = (offset, value) => [...value].forEach((ch, i) => h.setUint8(offset + i, ch.charCodeAt(0)));
-    ascii(0, "RIFF"); h.setUint32(4, 36 + pcm.byteLength, true); ascii(8, "WAVEfmt "); h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 1, true); h.setUint32(24, 16000, true); h.setUint32(28, 32000, true); h.setUint16(32, 2, true); h.setUint16(34, 16, true); ascii(36, "data"); h.setUint32(40, pcm.byteLength, true);
-    await Promise.all([loadEaf(new File([sampleEaf], "sample.eaf", { type: "application/xml" })), loadAudio(new File([header, pcm], "sample.wav", { type: "audio/wav" }))]);
+    const files = sampleFiles.map(sample => {
+      const binary = atob(sample.base64), bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new File([bytes], sample.name, { type: sample.type });
+    });
+    await Promise.all([loadEaf(files[0]), loadAudio(files[1])]);
   });
   const observer = new IntersectionObserver(entries => {
     for (const entry of entries) if (entry.isIntersecting) {
