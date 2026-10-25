@@ -4,9 +4,11 @@
   // Capture the empty application before any user file or example enters the UI.
   const pristineHtml = "<!doctype html>\n" + document.documentElement.outerHTML;
   const $ = id => document.getElementById(id);
-  const state = { eaf: null, speakers: [], sentences: [], audioFile: null, audio: null, audioStatus: "empty", urls: [], eafGeneration: 0, audioGeneration: 0, busy: false, abort: null };
+  const state = { eaf: null, speakers: [], sentences: [], audioFile: null, audio: null, audioStatus: "empty", urls: [], eafGeneration: 0, audioGeneration: 0, busy: false, abort: null, activeSpeaker: 0, graphRoots: new Set(), showAllTiers: false };
   const roles = { text0: ["表層形", "text0"], text: ["本文・形態素境界", "text"], morph: ["形態素", "morph"], gloss: ["グロス", "gloss"], pos: ["品詞", "pos・任意"], trans: ["自由訳", "trans"] };
-  const modeLabels = { "シンプル3層": "本文 → グロス → 訳", "3層": "本文＋形態素 → グロス → 訳", "4層": "表層形 → 本文 → グロス → 訳" };
+  const modeLabels = { "シンプル3層": "本文・グロス・自由訳", "3層": "本文・形態素・グロス・自由訳", "4層": "表層形・本文・グロス・自由訳" };
+  const shortRoles = { text0: "表層形", text: "本文", morph: "形態素", gloss: "グロス", pos: "品詞", trans: "自由訳" };
+  const activeRoles = speaker => Object.keys(roles).filter(role => !(role === "text0" && speaker.mode !== "4層") && !(role === "morph" && speaker.mode === "シンプル3層"));
   function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   const sizeText = bytes => bytes < 1000000 ? `${(bytes / 1000).toFixed(0)} KB` : `${(bytes / 1000000).toFixed(1)} MB`;
   const timeText = seconds => { const min = Math.floor(seconds / 60); return `${min}:${(seconds % 60).toFixed(2).padStart(5, "0")}`; };
@@ -46,43 +48,112 @@
     $("export-hint").textContent = error || (audioBlocked ? state.audioStatus === "loading" ? "音声情報を確認しています…" : "音声を選び直すか、音声を解除してください。" : count ? `${count.toLocaleString()}文 ${$("include-audio").checked && state.audioFile ? "＋ 分割音声" : "・ テキストのみ"}を書き出します。` : "まずEAFファイルを選択してください。");
   }
 
-  function renderMapping() {
+  function renderDiagram(speaker, index) {
+    const diagram = $("tier-diagram");
+    const scroll = [diagram.scrollLeft, diagram.scrollTop];
+    diagram.replaceChildren();
+    const enabledRoles = activeRoles(speaker);
+    const usedIds = new Set(enabledRoles.map(role => speaker.tiers[role]).filter(Boolean));
+    const roots = E.buildTierForest(state.eaf.info);
+    const members = node => [node, ...node.children.flatMap(members)];
+    for (const root of roots) {
+      if (members(root).some(node => usedIds.has(node.tier.id))) state.graphRoots.add(root.tier.id);
+    }
+    const shown = state.showAllTiers || !state.graphRoots.size ? roots : roots.filter(root => state.graphRoots.has(root.tier.id));
+    let count = 0, edgeCount = 0, warnings = 0;
+    function branch(node) {
+      const { tier } = node;
+      count++; if (node.warning) warnings++;
+      const assigned = enabledRoles.filter(role => speaker.tiers[role] === tier.id);
+      const row = element("li", "tier-branch"), card = element("article", "tier-node");
+      card.classList.toggle("is-used", assigned.length > 0);
+      card.classList.toggle("has-warning", !!node.warning);
+      card.dataset.tierId = tier.id;
+      const header = element("div", "tier-node-top");
+      header.append(element("span", "tier-role-name", assigned.length ? assigned.map(role => shortRoles[role]).join("・") : "未使用"), element("span", "tier-node-count", `${tier.count}件`));
+      const name = element("h4", "tier-node-name", tier.id); name.title = tier.id;
+      const sample = element("p", "tier-sample", tier.sample || "（内容がありません）"); sample.title = tier.sample;
+      card.append(header, name, element("span", "sr-only", tier.parent ? `親ティア: ${tier.parent}` : "親ティアなし"), sample);
+      const field = element("label", "tier-role-field"), select = element("select");
+      select.id = `tier-role-${state.eaf.info.indexOf(tier)}`;
+      select.setAttribute("aria-label", `${tier.id} の役割（${speaker.name || `話者${index + 1}`}）`);
+      select.add(new Option("使用しない", ""));
+      for (const role of enabledRoles) select.add(new Option(shortRoles[role], role));
+      if (assigned.length > 1) {
+        const multiple = new Option(assigned.map(role => shortRoles[role]).join("・"), "multiple");
+        multiple.disabled = true; select.add(multiple);
+      }
+      select.value = assigned.length > 1 ? "multiple" : assigned[0] || "";
+      select.addEventListener("change", () => {
+        for (const role of enabledRoles) if (speaker.tiers[role] === tier.id) speaker.tiers[role] = "";
+        if (select.value) speaker.tiers[select.value] = tier.id;
+        speaker.uncertain = false; speaker.edited = true;
+        renderMapping();
+      });
+      field.append(element("span", "", "役割"), select); card.append(field);
+      if (node.warning) card.append(element("p", "tier-node-warning", node.warning));
+      row.append(card);
+      if (node.children.length) {
+        const children = element("ul", "tier-children");
+        for (const child of node.children) { edgeCount++; children.append(branch(child)); }
+        row.append(children);
+      }
+      return row;
+    }
+    for (const root of shown) {
+      const tree = element("ul", "tier-tree"); tree.append(branch(root)); diagram.append(tree);
+    }
+    $("diagram-caption").textContent = `${count} / ${state.eaf.info.length} ティアを表示。` + (warnings ? " 親子関係の警告をカードで確認してください。" : !edgeCount ? "この範囲には親子関係の指定がないため、線は表示していません。" : "線はEAFに保存された親子関係を表します。");
+    $("show-all-tiers").checked = state.showAllTiers;
+    diagram.scrollLeft = scroll[0]; diagram.scrollTop = scroll[1];
+  }
+
+  function renderMapping({ updateOutput = true } = {}) {
+    const focusId = document.activeElement?.id;
     $("mapping-empty").hidden = !!state.eaf;
     $("mapping-content").hidden = !state.eaf;
     $("mapping-count").hidden = !state.eaf;
     $("mapping-count").textContent = `${state.speakers.length} 話者`;
     $("add-speaker").disabled = !state.eaf || state.speakers.length >= 8 || state.busy;
-    $("speakers").replaceChildren();
-    if (!state.eaf) { updatePreview(); return; }
-    const uncertain = state.speakers.some(s => s.uncertain);
+    $("speakers").replaceChildren(); $("speaker-tabs").replaceChildren(); $("role-fields").replaceChildren();
+    if (!state.eaf) { $("tier-diagram").replaceChildren(); updatePreview(); return; }
+    state.activeSpeaker = Math.min(state.activeSpeaker, state.speakers.length - 1);
+    const index = state.activeSpeaker, speaker = state.speakers[index];
+    const missing = activeRoles(speaker).filter(role => role !== "pos" && !speaker.tiers[role]);
     const notice = $("mapping-notice");
-    notice.classList.toggle("warning", uncertain || state.eaf.skipped > 0);
-    notice.textContent = uncertain ? "ティア名から役割を判断しきれない箇所があります。本文・グロス・自由訳の対応を確認してください。" : "話者情報・ティア名・親子関係から対応候補を設定しました。下のプレビューを確認し、必要な箇所だけ変更してください。";
+    notice.classList.toggle("warning", speaker.uncertain || missing.length > 0 || state.eaf.skipped > 0);
+    notice.textContent = missing.length ? `${missing.map(role => shortRoles[role]).join("・")}の役割が未設定です。カードの「役割」か、下の詳細設定で対応するティアを選んでください。` : speaker.uncertain ? "役割を判断しきれない箇所があります。カードの内容を見て、本文・グロス・自由訳の対応を確認してください。" : speaker.edited ? "役割の対応を更新しました。カードの内容と、下の出力プレビューを確認してください。" : "役割を自動判定しました。カードの内容と役割を確認し、必要な箇所だけ変更してください。";
     if (state.eaf.skipped) notice.textContent += ` 時間を解決できなかった ${state.eaf.skipped} 件は除外しています。`;
-    state.speakers.forEach((speaker, index) => {
-      const card = element("div", "speaker-card"), top = element("div", "speaker-top");
-      const name = element("input", "speaker-name"); name.type = "text"; name.value = speaker.name; name.setAttribute("aria-label", `話者${index + 1}の名前`);
-      name.addEventListener("input", () => { speaker.name = name.value; updatePreview(); });
-      const mode = element("select", "mode-select"); mode.setAttribute("aria-label", `話者${index + 1}の構造`);
-      for (const value of E.MODES) mode.add(new Option(modeLabels[value], value, false, value === speaker.mode));
-      mode.addEventListener("change", () => { speaker.mode = mode.value; renderMapping(); });
-      const remove = element("button", "remove-speaker", "×"); remove.setAttribute("aria-label", `話者${index + 1}を削除`); remove.disabled = state.speakers.length === 1;
-      remove.addEventListener("click", () => { state.speakers.splice(index, 1); renderMapping(); });
-      top.append(element("span", "speaker-index", String(index + 1)), name, mode, remove); card.append(top);
-      const grid = element("div", "mapping-grid");
-      for (const [role, labels] of Object.entries(roles)) {
-        if (role === "text0" && speaker.mode !== "4層") continue;
-        if (role === "morph" && speaker.mode === "シンプル3層") continue;
-        const field = element("label", "field"), title = element("span", "", labels[0]); title.append(element("small", "", labels[1]));
-        const select = element("select"); select.setAttribute("aria-label", `話者${index + 1} ${labels[0]}`);
-        select.add(new Option("選択しない", ""));
-        for (const tier of state.eaf.info) select.add(new Option(`${tier.id}  (${tier.count})`, tier.id));
-        select.value = speaker.tiers[role] || "";
-        select.addEventListener("change", () => { speaker.tiers[role] = select.value; speaker.uncertain = false; updatePreview(); });
-        field.append(title, select); grid.append(field);
-      }
-      card.append(grid); $("speakers").append(card);
+    state.speakers.forEach((item, itemIndex) => {
+      const tab = element("button", "speaker-tab"); tab.type = "button"; tab.id = `speaker-tab-${itemIndex}`;
+      tab.setAttribute("aria-pressed", String(itemIndex === index));
+      tab.append(element("span", "speaker-index", String(itemIndex + 1)));
+      const label = element("span", "", item.name || `話者${itemIndex + 1}`); label.id = `speaker-tab-name-${itemIndex}`; tab.append(label);
+      tab.addEventListener("click", () => { state.activeSpeaker = itemIndex; state.graphRoots.clear(); $("tier-diagram").scrollTo(0, 0); renderMapping({ updateOutput: false }); });
+      $("speaker-tabs").append(tab);
     });
+    const top = element("div", "speaker-settings");
+    const nameField = element("label", "field"), name = element("input", "speaker-name");
+    name.type = "text"; name.value = speaker.name; name.id = "speaker-name";
+    name.addEventListener("input", () => { speaker.name = name.value; $(`speaker-tab-name-${index}`).textContent = name.value || `話者${index + 1}`; updatePreview(); });
+    nameField.append(element("span", "", "出力する話者名"), name);
+    const modeField = element("label", "field"), mode = element("select", "mode-select"); mode.id = "speaker-mode";
+    for (const value of E.MODES) mode.add(new Option(modeLabels[value], value, false, value === speaker.mode));
+    mode.addEventListener("change", () => { speaker.mode = mode.value; speaker.edited = true; renderMapping(); });
+    modeField.append(element("span", "", "例文の構成"), mode);
+    const remove = element("button", "text-button remove-speaker", "この話者を削除"); remove.disabled = state.speakers.length === 1;
+    remove.addEventListener("click", () => { state.speakers.splice(index, 1); state.graphRoots.clear(); renderMapping(); });
+    top.append(nameField, modeField, remove); $("speakers").append(top);
+    for (const role of activeRoles(speaker)) {
+      const labels = roles[role], field = element("label", "field"), title = element("span", "", labels[0]); title.append(element("small", "", labels[1]));
+      const select = element("select"); select.id = `role-field-${role}`; select.setAttribute("aria-label", `話者${index + 1} ${labels[0]}`);
+      select.add(new Option("選択しない", ""));
+      for (const tier of state.eaf.info) select.add(new Option(`${tier.id}  (${tier.count})`, tier.id));
+      select.value = speaker.tiers[role] || "";
+      select.addEventListener("change", () => { speaker.tiers[role] = select.value; speaker.uncertain = false; speaker.edited = true; renderMapping(); });
+      field.append(title, select); $("role-fields").append(field);
+    }
+    renderDiagram(speaker, index);
     $("tier-count").textContent = `${state.eaf.info.length} ティア`;
     $("tier-table").replaceChildren();
     for (const tier of state.eaf.info) {
@@ -90,7 +161,8 @@
       for (const value of [tier.id, tier.parent || "—", tier.participant || "—", String(tier.count), tier.sample.slice(0, 70)]) tr.append(element("td", "", value));
       $("tier-table").append(tr);
     }
-    updatePreview();
+    if (updateOutput) updatePreview();
+    if (focusId) $(focusId)?.focus({ preventScroll: true });
   }
 
   async function loadEaf(file) {
@@ -109,7 +181,7 @@
       const eaf = E.parseEaf(text);
       if (generation !== state.eafGeneration) return;
       if (!eaf.info.length) throw new Error("EAF内にティアが見つかりませんでした。");
-      state.eaf = eaf; state.speakers = E.guessSpeakers(eaf);
+      state.eaf = eaf; state.speakers = E.guessSpeakers(eaf); state.activeSpeaker = 0; state.graphRoots.clear(); state.showAllTiers = false;
       $("eaf-meta").textContent = `${sizeText(file.size)} · ${eaf.info.length} ティア · ${Math.round(performance.now() - started)} msで読み込み`;
       $("eaf-zone").classList.add("ready"); $("eaf-action").textContent = "別のファイルに変更 ＋"; $("file-step-check").textContent = "✓";
       renderMapping();
@@ -228,7 +300,10 @@
   }
   bindDrop("eaf-zone", "eaf-file", loadEaf); bindDrop("audio-zone", "audio-file", loadAudio);
   $("remove-audio").addEventListener("click", clearAudio);
-  $("add-speaker").addEventListener("click", () => { if (state.speakers.length >= 8) return; state.speakers.push({ name: `話者${state.speakers.length + 1}`, mode: "シンプル3層", tiers: { text0: "", text: "", morph: "", gloss: "", pos: "", trans: "" }, uncertain: true }); renderMapping(); });
+  $("add-speaker").addEventListener("click", () => { if (state.speakers.length >= 8) return; state.speakers.push({ name: `話者${state.speakers.length + 1}`, mode: "シンプル3層", tiers: { text0: "", text: "", morph: "", gloss: "", pos: "", trans: "" }, uncertain: true }); state.activeSpeaker = state.speakers.length - 1; state.graphRoots.clear(); renderMapping(); });
+  $("show-all-tiers").addEventListener("change", event => { state.showAllTiers = event.target.checked; renderMapping({ updateOutput: false }); });
+  $("diagram-left").addEventListener("click", () => $("tier-diagram").scrollBy({ left: -280, behavior: "smooth" }));
+  $("diagram-right").addEventListener("click", () => $("tier-diagram").scrollBy({ left: 280, behavior: "smooth" }));
   $("include-audio").addEventListener("change", updatePreview);
   $("gb4e-style").addEventListener("change", resetResults);
   $("padding").addEventListener("input", () => { $("padding-value").textContent = `${$("padding").value} ms`; resetResults(); });
