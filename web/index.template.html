@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="EAFから例文・GB4E・分割音声を作成。ファイルを送信せず、ブラウザだけで動くeaftox。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="color-scheme" content="light">
+  <title>eaftox — EAF変換ツール</title>
+  <style>/* STYLES */</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="eaftox ホーム">eaftox<span class="brand-dot">.</span></a>
+    <span class="edition">BROWSER EDITION</span>
+    <div class="top-actions"><span class="local-badge"><span></span>このPCの中で処理</span><button class="text-button" id="save-app">オフライン用に保存 <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar" aria-label="作業の流れ">
+      <p class="eyebrow">EAF CONVERTER</p>
+      <nav class="steps">
+        <a href="#files" class="step active"><span class="step-number">01</span><span>ファイルを選ぶ<small>EAFと音声を開く</small></span><span class="step-check" id="file-step-check"></span></a>
+        <a href="#mapping" class="step"><span class="step-number">02</span><span>構造を確認<small>話者とティアを対応付ける</small></span></a>
+        <a href="#export" class="step"><span class="step-number">03</span><span>書き出す<small>例文と音声をダウンロード</small></span></a>
+      </nav>
+      <div class="sidebar-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4 8 9 8 9s8-5 8-9V6l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg><strong>録音データは、手元に。</strong><p>EAFも音声もサーバーに送信しません。アカウントやインストールも不要です。</p></div>
+      <a class="creator" href="https://mshimoji.com" target="_blank" rel="noopener noreferrer">Michinori Shimoji <span>↗</span></a>
+      <p class="version">eaftox browser · 2026.10</p>
+    </aside>
+    <main>
+      <div class="page-heading"><div><p class="eyebrow">FIELDWORK → EXAMPLES</p><h1>例文と音声を、ひとまとめに。</h1><p class="lead">ELANのEAFから、GB4E・テキスト・文ごとの音声を作成します。</p></div><button id="load-demo" class="button secondary small">サンプルで試す <span aria-hidden="true">↗</span></button></div>
+      <div id="alert" class="alert" role="alert" hidden></div>
+
+      <section id="files" class="panel">
+        <div class="section-heading"><div><span class="section-number">01</span><h2>ファイルを選ぶ</h2></div><span class="section-caption">ドラッグ＆ドロップにも対応</span></div>
+        <div class="file-grid">
+          <label class="dropzone" id="eaf-zone"><input id="eaf-file" type="file" accept=".eaf,application/xml,text/xml"><span class="file-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8Z"/><path d="M14 3v5h5M8 12h8M8 16h5"/></svg></span><span class="file-label">EAFファイル <span class="required">必須</span></span><strong id="eaf-name">.eaf を選択、またはドロップ</strong><span class="file-meta" id="eaf-meta">ティアと時間情報を読み込みます</span><span class="file-action" id="eaf-action">ファイルを選択 <span>＋</span></span></label>
+          <label class="dropzone" id="audio-zone"><input id="audio-file" type="file" accept=".wav,.mp3,audio/wav,audio/mpeg"><span class="file-icon audio-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg></span><span class="file-label">音声ファイル <span class="optional">任意</span></span><strong id="audio-name">.wav / .mp3 を選択、またはドロップ</strong><span class="file-meta" id="audio-meta">音声を分割する場合に選択してください</span><span class="file-action" id="audio-action">ファイルを選択 <span>＋</span></span></label>
+        </div>
+        <div class="file-footnote"><span class="tiny-lock" aria-hidden="true">▣</span> アップロード待ちはありません。ファイルはお使いのブラウザだけで読み込みます。<button id="remove-audio" class="text-button" hidden>音声を解除</button></div>
+      </section>
+
+      <section id="mapping" class="panel">
+        <div class="section-heading"><div><span class="section-number">02</span><h2>構造を確認</h2><span id="mapping-count" class="count-badge" hidden></span></div><button id="add-speaker" class="text-button" disabled>＋ 話者を追加</button></div>
+        <div id="mapping-empty" class="empty-state"><span class="empty-diagram" aria-hidden="true">▤ → ≡</span><p>EAFを選ぶと、話者とティアの候補がここに表示されます。</p><small>対応を確認し、必要な箇所だけ変更してください。</small></div>
+        <div id="mapping-content" hidden><div id="mapping-notice" class="subtle-notice"></div><div id="speakers"></div><details class="tier-details"><summary>検出したティアの一覧 <span id="tier-count"></span></summary><div class="table-scroll"><table><thead><tr><th>ティア</th><th>親ティア</th><th>話者</th><th>件数</th><th>内容の例</th></tr></thead><tbody id="tier-table"></tbody></table></div></details></div>
+      </section>
+
+      <section id="export" class="panel">
+        <div class="section-heading"><div><span class="section-number">03</span><h2>確認して、書き出す</h2></div><span id="sentence-count" class="section-caption"></span></div>
+        <div class="export-layout"><div class="preview-column"><div class="preview-heading"><span class="eyebrow">PREVIEW</span><span>先頭3文</span></div><div id="preview" class="preview"><p class="preview-empty">ティアを選ぶと、出力する例文を確認できます。</p></div></div><div class="settings-column"><label class="field"><span>GB4Eスタイル</span><select id="gb4e-style"><option>標準版</option><option>行間調整版</option><option>最小限版</option></select></label><label class="check-field"><input type="checkbox" id="include-audio" checked><span>文ごとの音声を含める<small>WAVは元の音質・チャンネル数を保持</small></span></label><label class="field padding-field"><span>音声の前後余白 <output id="padding-value">100 ms</output></span><input id="padding" type="range" min="0" max="500" step="50" value="100"><span class="range-labels"><span>0 ms</span><span>500 ms</span></span></label><p class="settings-note">ZIPには .tex・.txt と分割WAVをまとめます。品詞の行はテキスト形式に出力します。</p></div></div>
+        <div class="export-footer"><div class="export-hint" id="export-hint">まずEAFファイルを選択してください。</div><button id="convert" class="button primary" disabled>ファイルを作成 <span aria-hidden="true">→</span></button><button id="cancel" class="button secondary" hidden>中止</button></div>
+        <div id="progress-region" hidden><div class="progress-label"><span id="progress-text">準備中…</span><span id="progress-percent">0%</span></div><progress id="progress" value="0" max="1"></progress></div>
+        <div id="results" class="results" hidden><div><span class="success-icon" aria-hidden="true">✓</span><div><strong>書き出しの準備ができました</strong><p id="result-summary"></p></div></div><div class="download-actions"><a id="download-zip" class="button primary" download>まとめてダウンロード <span>↓</span></a><a id="download-tex" class="button secondary" download>GB4E .tex</a><a id="download-txt" class="button secondary" download>テキスト .txt</a></div></div>
+      </section>
+      <footer class="page-footer"><span>eaftox — for linguistic fieldwork</span><span>無料・登録不要・サーバーへのファイル送信なし</span></footer>
+    </main>
+  </div>
+  <noscript><p class="alert">このアプリにはJavaScriptが必要です。ブラウザのJavaScriptを有効にしてください。</p></noscript>
+  <script>/* CORE */</script>
+  <script>/* APPLICATION */</script>
+</body>
+</html>
