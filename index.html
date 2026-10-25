@@ -44,6 +44,25 @@
 .empty-chain{display:block;font:15px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;color:#a0ae96;margin-bottom:16px;overflow-wrap:anywhere}
 @media(max-width:1120px){.speaker-settings{grid-template-columns:145px minmax(0,1fr);gap:12px}.speaker-settings .remove-speaker{grid-column:1/-1;justify-self:end;padding:0}}
 @media(max-width:540px){.speaker-settings{grid-template-columns:minmax(0,1fr)}.speaker-settings .speaker-name,.speaker-settings .mode-select{font-size:16px}.speaker-tabs{margin-top:4px}.speaker-tab{padding:8px 11px;font-size:13px}.chain-heading{display:block}.chain-heading>span{display:block;margin-top:7px}.tier-chain{gap:5px;padding:12px 0}.chain-tier{font-size:17px;gap:5px}.chain-link{font-size:15px}.chain-step{gap:5px}.removed-row small{width:100%}.empty-chain{font-size:13px}}
+
+
+/* Keep tier choices and their output visible side by side. */
+.mapping-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start;margin-bottom:22px}
+.mapping-layout>.panel{margin-bottom:0;min-width:0}
+.mapping-preview{position:sticky;top:102px}
+.mapping-preview .preview{max-height:560px;overflow:auto}
+.mapping-preview .section-heading{gap:10px}
+.mapping-preview .section-caption{white-space:nowrap}
+.mapping-layout .chain-heading{display:block}
+.mapping-layout .chain-heading>span{display:block;margin-top:7px}
+.mapping-layout .speaker-settings{grid-template-columns:minmax(0,1fr)}
+.mapping-layout .speaker-settings .remove-speaker{justify-self:end;padding:0}
+.mapping-layout .mapping-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.export-settings{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.export-settings .check-field,.export-settings .padding-field{margin-top:0}
+.export-settings .check-field{padding-top:4px}
+@media(max-width:1000px){.mapping-layout{grid-template-columns:minmax(0,1fr)}.mapping-preview{position:static}.mapping-preview .preview{max-height:none}.export-settings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.mapping-layout{gap:17px;margin-bottom:17px}.mapping-layout .mapping-grid,.export-settings{grid-template-columns:minmax(0,1fr)}.mapping-preview .section-caption{display:block}.export-settings{gap:18px}}
 </style>
 </head>
 <body>
@@ -77,6 +96,7 @@
         <div class="file-footnote"><span class="tiny-lock" aria-hidden="true">▣</span> アップロード待ちはありません。ファイルはお使いのブラウザだけで読み込みます。<button id="remove-audio" class="text-button" hidden>音声を解除</button></div>
       </section>
 
+      <div class="mapping-layout">
       <section id="mapping" class="panel">
         <div class="section-heading"><div><span class="section-number">02</span><h2>構造を確認</h2><span id="mapping-count" class="count-badge" hidden></span></div><button id="add-speaker" class="text-button" disabled>＋ 話者を追加</button></div>
         <div id="mapping-empty" class="empty-state"><span class="empty-chain" aria-hidden="true">text0 — text — morph — gloss — trans</span><p>EAFを選ぶと、使うティアがチェインで表示されます。</p><small>不要なティアはクリックで外せます。</small></div>
@@ -91,9 +111,20 @@
         </div>
       </section>
 
+      <section class="panel mapping-preview" aria-labelledby="preview-title">
+        <div class="section-heading"><div><h2 id="preview-title">プレビュー</h2><span id="sentence-count" class="count-badge"></span></div><span class="section-caption">先頭3文</span></div>
+        <div id="preview" class="preview"><p class="preview-empty">左のチェインでティアを選ぶと、出力する例文を確認できます。</p></div>
+      </section>
+      </div>
+
       <section id="export" class="panel">
-        <div class="section-heading"><div><span class="section-number">03</span><h2>確認して、書き出す</h2></div><span id="sentence-count" class="section-caption"></span></div>
-        <div class="export-layout"><div class="preview-column"><div class="preview-heading"><span class="eyebrow">PREVIEW</span><span>先頭3文</span></div><div id="preview" class="preview"><p class="preview-empty">ティアを選ぶと、出力する例文を確認できます。</p></div></div><div class="settings-column"><label class="field"><span>GB4Eスタイル</span><select id="gb4e-style"><option>標準版</option><option>行間調整版</option><option>最小限版</option></select></label><label class="check-field"><input type="checkbox" id="include-audio" checked><span>文ごとの音声を含める<small>WAVは元の音質・チャンネル数を保持</small></span></label><label class="field padding-field"><span>音声の前後余白 <output id="padding-value">100 ms</output></span><input id="padding" type="range" min="0" max="500" step="50" value="100"><span class="range-labels"><span>0 ms</span><span>500 ms</span></span></label><p class="settings-note">チェインに残した行を .tex・.txt に出力し、分割WAVとZIPにまとめます。</p></div></div>
+        <div class="section-heading"><div><span class="section-number">03</span><h2>書き出す</h2></div></div>
+        <div class="export-settings">
+          <label class="field"><span>GB4Eスタイル</span><select id="gb4e-style"><option>標準版</option><option>行間調整版</option><option>最小限版</option></select></label>
+          <label class="check-field"><input type="checkbox" id="include-audio" checked><span>文ごとの音声を含める<small>WAVは元の音質・チャンネル数を保持</small></span></label>
+          <label class="field padding-field"><span>音声の前後余白 <output id="padding-value">100 ms</output></span><input id="padding" type="range" min="0" max="500" step="50" value="100"><span class="range-labels"><span>0 ms</span><span>500 ms</span></span></label>
+        </div>
+        <p class="settings-note">チェインに残した行を .tex・.txt に出力し、分割WAVとZIPにまとめます。</p>
         <div class="export-footer"><div class="export-hint" id="export-hint">まずEAFファイルを選択してください。</div><button id="convert" class="button primary" disabled>ファイルを作成 <span aria-hidden="true">→</span></button><button id="cancel" class="button secondary" hidden>中止</button></div>
         <div id="progress-region" hidden><div class="progress-label"><span id="progress-text">準備中…</span><span id="progress-percent">0%</span></div><progress id="progress" value="0" max="1"></progress></div>
         <div id="results" class="results" hidden><div><span class="success-icon" aria-hidden="true">✓</span><div><strong>書き出しの準備ができました</strong><p id="result-summary"></p></div></div><div class="download-actions"><a id="download-zip" class="button primary" download>まとめてダウンロード <span>↓</span></a><a id="download-tex" class="button secondary" download>GB4E .tex</a><a id="download-txt" class="button secondary" download>テキスト .txt</a></div></div>
