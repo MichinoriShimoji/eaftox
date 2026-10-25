@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 html = (ROOT / "web/index.template.html").read_text(encoding="utf-8")
+html = html.replace("<!-- LICENSE -->", "<!--\n" + (ROOT / "LICENSE").read_text(encoding="utf-8").strip() + "\n-->")
 for marker, filename in [("/* STYLES */", "styles.css"), ("/* CORE */", "core.js"), ("/* APPLICATION */", "app.js")]:
     content = (ROOT / "web" / filename).read_text(encoding="utf-8")
     if filename.endswith(".js"):

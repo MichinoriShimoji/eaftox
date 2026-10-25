@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use eaftox in your research, please cite this software."
+type: software
+title: "eaftox: Browser-based EAF converter with audio segmentation"
+authors:
+  - family-names: Shimoji
+    given-names: Michinori
+version: 1.0.0
+license: MIT
+url: "https://michinorishimoji.github.io/eaftox/"
+repository-code: "https://github.com/MichinoriShimoji/eaftox"
+abstract: >-
+  eaftox converts ELAN EAF annotations to interlinear glossed text and
+  LaTeX gb4e examples and extracts corresponding audio segments. The
+  browser edition processes EAF, WAV, and MP3 files locally without
+  uploading them to a server. It provides automatic tier mapping,
+  clickable output-tier selection, a live preview, ZIP export, and
+  a self-contained HTML file for offline use.
+keywords:
+  - linguistics
+  - ELAN
+  - EAF
+  - interlinear glossed text
+  - audio segmentation
+  - language documentation
