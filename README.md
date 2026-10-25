@@ -39,6 +39,15 @@ node --test tests/core.test.cjs
 
 テストは元のPython版との出力比較、リポジトリ内の3種類のサンプルEAF、各種WAVのフレーム単位の切り出し、40MB WAVのヘッダー限定読み込み、ZIPのCRC・Unicodeファイル名・中止処理を確認します。`app.py` はHugging Face版の比較用ソースです。
 
+### 引用とライセンス
+
+著者は **Michinori Shimoji** です。引用情報は [`CITATION.cff`](CITATION.cff) に収録しています。
+ソフトウェアのコードと付属文書は [MITライセンス](LICENSE) で公開しています。オフライン用HTMLにもライセンス本文を含めています。
+
+### Hugging Face版の移転案内
+
+[`huggingface/app.py`](huggingface/app.py) は、旧SpaceをGitHub Pagesへの移転案内に置き換えるためのファイルです。Spaceのルートの `app.py` と差し替えて使います。変換機能とファイルのアップロード欄はありません。Gradio以外の追加ライブラリは不要です。
+
 ## 従来のPython版
 
 `eaftox` は、ELANの `.eaf` ファイルから、 文単位でInterlinear Glossed Text (IGT)に自動変換し、音声も切り出すPythonスクリプトです。
