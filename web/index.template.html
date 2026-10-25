@@ -42,8 +42,18 @@
 
       <section id="mapping" class="panel">
         <div class="section-heading"><div><span class="section-number">02</span><h2>構造を確認</h2><span id="mapping-count" class="count-badge" hidden></span></div><button id="add-speaker" class="text-button" disabled>＋ 話者を追加</button></div>
-        <div id="mapping-empty" class="empty-state"><span class="empty-diagram" aria-hidden="true">▤ → ≡</span><p>EAFを選ぶと、話者とティアの候補がここに表示されます。</p><small>対応を確認し、必要な箇所だけ変更してください。</small></div>
-        <div id="mapping-content" hidden><div id="mapping-notice" class="subtle-notice"></div><div id="speakers"></div><details class="tier-details"><summary>検出したティアの一覧 <span id="tier-count"></span></summary><div class="table-scroll"><table><thead><tr><th>ティア</th><th>親ティア</th><th>話者</th><th>件数</th><th>内容の例</th></tr></thead><tbody id="tier-table"></tbody></table></div></details></div>
+        <div id="mapping-empty" class="empty-state"><span class="empty-diagram" aria-hidden="true">▤ ─┬─ ▤<br>　　└─ ▤</span><p>EAFを選ぶと、ティアの親子関係が図で表示されます。</p><small>自動判定された役割を確認し、カード上で修正できます。</small></div>
+        <div id="mapping-content" hidden>
+          <div id="mapping-notice" class="subtle-notice"></div>
+          <div id="speaker-tabs" class="speaker-tabs" role="group" aria-label="構造を確認する話者"></div>
+          <div id="speakers"></div>
+          <div class="diagram-heading"><div><h3>ティアの親子関係</h3><p id="diagram-help">線でつながったカードが親子です。役割はカード内で変更できます。</p></div><label class="diagram-filter"><input type="checkbox" id="show-all-tiers">すべてのティアを表示</label></div>
+          <div class="diagram-legend"><span><i class="legend-used"></i>この話者で使用</span><span><i class="legend-unused"></i>この話者では未使用</span><span class="legend-edge">⟶ EAFの親子関係</span></div>
+          <div id="tier-diagram" class="tier-diagram" tabindex="0" role="region" aria-label="ティアの依存関係図" aria-describedby="diagram-help diagram-caption"></div>
+          <div class="diagram-footer"><p id="diagram-caption"></p><div class="diagram-scroll"><button id="diagram-left" type="button" aria-label="図を左へスクロール">←</button><span>スクロールして全体を確認</span><button id="diagram-right" type="button" aria-label="図を右へスクロール">→</button></div></div>
+          <details id="mapping-details" class="tier-details"><summary>役割ごとの対応を詳しく調整</summary><div id="role-fields" class="mapping-grid"></div></details>
+          <details class="tier-details"><summary>検出したティアの一覧 <span id="tier-count"></span></summary><div class="table-scroll"><table><thead><tr><th>ティア</th><th>親ティア</th><th>話者</th><th>件数</th><th>内容の例</th></tr></thead><tbody id="tier-table"></tbody></table></div></details>
+        </div>
       </section>
 
       <section id="export" class="panel">

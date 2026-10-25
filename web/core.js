@@ -125,6 +125,37 @@
     });
   }
 
+  // Keep the EAF hierarchy separate from output roles: roles never create edges.
+  function buildTierForest(info) {
+    const nodes = new Map(info.map(tier => [tier.id, { tier, children: [], warning: "" }]));
+    const parents = new Map();
+    for (const tier of info) {
+      if (tier.parent && nodes.has(tier.parent)) parents.set(tier.id, tier.parent);
+      else if (tier.parent) nodes.get(tier.id).warning = `親ティア「${tier.parent}」が見つかりません。`;
+    }
+    const visited = new Set();
+    for (const tier of info) {
+      const path = [], positions = new Map();
+      let id = tier.id;
+      while (id && !visited.has(id)) {
+        if (positions.has(id)) {
+          for (const cyclic of path.slice(positions.get(id))) nodes.get(cyclic).warning = "親子関係が循環しています。図では循環する接続を1本省略しています。";
+          parents.delete(path.at(-1));
+          break;
+        }
+        positions.set(id, path.length); path.push(id); id = parents.get(id);
+      }
+      for (const seen of path) visited.add(seen);
+    }
+    const roots = [];
+    for (const [id, node] of nodes) {
+      const parent = parents.get(id);
+      if (parent) nodes.get(parent).children.push(node);
+      else roots.push(node);
+    }
+    return roots;
+  }
+
   function extractSentences(eaf, speakers) {
     const sentences = [];
     for (const [speakerIndex, speaker] of speakers.entries()) {
@@ -436,5 +467,5 @@
   const safeName = value => (value || "").normalize("NFC").replace(/[^\p{L}\p{N}_\s-]/gu, "").trim().replace(/\s+/g, "_").slice(0, 50);
   function audioFilename(sent, index) { return `audio_segments/${String(index + 1).padStart(3, "0")}_${safeName(sent.speaker)}_${safeName((sent.text0 || sent.text || "").slice(0, 30)) || "sentence"}.wav`; }
 
-  return { VERSION, MODES, NONE, parseEaf, resolveTiers, guessSpeakers, extractSentences, alignMorphs, normalize, ipaToTipa, toText, toGb4e, openWav, sliceWav, sliceDecodedAudio, segmentBounds, makeZip, crc32, audioFilename };
+  return { VERSION, MODES, NONE, parseEaf, resolveTiers, guessSpeakers, buildTierForest, extractSentences, alignMorphs, normalize, ipaToTipa, toText, toGb4e, openWav, sliceWav, sliceDecodedAudio, segmentBounds, makeZip, crc32, audioFilename };
 });

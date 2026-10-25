@@ -51,6 +51,28 @@ test('bad reference cycles are reported instead of hanging', () => {
   const eaf = E.resolveTiers([{id:'text',annotations:[{annotation_id:'a',ref_id:'b',value:'x'},{annotation_id:'b',ref_id:'a',value:'y'}]}]);
   assert.equal(eaf.skipped,2); assert.equal(eaf.tiers.get('text').length,0);
 });
+test('tier diagram preserves actual branching and independent roots in repository EAFs', () => {
+  for (const fixture of require('./repository-samples.json')) {
+    const info = E.resolveTiers(fixture.records).info;
+    const roots = E.buildTierForest(info), seen = [], edges = [];
+    function visit(node) { seen.push(node.tier.id); for (const child of node.children) { edges.push([node.tier.id,child.tier.id]); visit(child); } }
+    roots.forEach(visit);
+    assert.deepEqual(seen.sort(),info.map(t=>t.id).sort());
+    assert.deepEqual(edges.sort(),info.filter(t=>t.parent).map(t=>[t.parent,t.id]).sort());
+    if (fixture.file === 'sample4.eaf') assert.deepEqual(roots.map(n=>n.tier.id),['text0','text1']);
+  }
+});
+test('tier diagram retains orphan/cyclic tiers with warnings and never invents parent links', () => {
+  const info = [{id:'child',parent:'a'},{id:'a',parent:'b'},{id:'b',parent:'a'},{id:'orphan',parent:'missing'},{id:'self',parent:'self'}];
+  const seen = [], edges = [], warned = [];
+  function visit(node) { seen.push(node.tier.id); if(node.warning) warned.push(node.tier.id); for(const child of node.children) { edges.push([node.tier.id,child.tier.id]); visit(child); } }
+  E.buildTierForest(info).forEach(visit);
+  assert.deepEqual(seen.sort(),info.map(t=>t.id).sort());
+  assert.equal(edges.length,2);
+  for(const [parent,id] of edges) assert.equal(info.find(t=>t.id===id).parent,parent);
+  assert.deepEqual(warned.sort(),['a','b','orphan','self']);
+  assert.equal(info.find(t=>t.id==='b').parent,'a');
+});
 test('LaTeX escaping covers translations and speaker labels', () => {
   const output = E.toGb4e([{text:'a',trans:'50% & x_y $1',speaker:'A&B'},{text:'b',speaker:'C'}]);
   assert.ok(output.includes('50\\% \\& x\\_y \\$1'));
