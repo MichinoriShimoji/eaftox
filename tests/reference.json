@@ -1,0 +1,381 @@
+{
+  "records": [
+    {
+      "id": "text0@A",
+      "annotations": [
+        {
+          "annotation_id": "a1",
+          "value": "ɕi=ga hon=o yom-da.",
+          "start_time": 200,
+          "end_time": 1900
+        }
+      ],
+      "parent": "",
+      "participant": "A"
+    },
+    {
+      "id": "text@A",
+      "annotations": [
+        {
+          "annotation_id": "a2",
+          "value": "ɕi=ga hon=o yom-da.",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a1"
+        }
+      ],
+      "parent": "text0@A",
+      "participant": ""
+    },
+    {
+      "id": "morph@A",
+      "annotations": [
+        {
+          "annotation_id": "m0",
+          "value": "ɕi",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        },
+        {
+          "annotation_id": "m1",
+          "value": "ga",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        },
+        {
+          "annotation_id": "m2",
+          "value": "hon",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        },
+        {
+          "annotation_id": "m3",
+          "value": "o",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        },
+        {
+          "annotation_id": "m4",
+          "value": "yom",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        },
+        {
+          "annotation_id": "m5",
+          "value": "da",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        },
+        {
+          "annotation_id": "m6",
+          "value": ".",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a2"
+        }
+      ],
+      "parent": "text@A",
+      "participant": ""
+    },
+    {
+      "id": "gloss@A",
+      "annotations": [
+        {
+          "annotation_id": "g0",
+          "value": "3SG",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m0"
+        },
+        {
+          "annotation_id": "g1",
+          "value": "NOM",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m1"
+        },
+        {
+          "annotation_id": "g2",
+          "value": "book",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m2"
+        },
+        {
+          "annotation_id": "g3",
+          "value": "ACC",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m3"
+        },
+        {
+          "annotation_id": "g4",
+          "value": "read",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m4"
+        },
+        {
+          "annotation_id": "g5",
+          "value": "PST",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m5"
+        },
+        {
+          "annotation_id": "g6",
+          "value": "EOS",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m6"
+        }
+      ],
+      "parent": "morph@A",
+      "participant": ""
+    },
+    {
+      "id": "pos@A",
+      "annotations": [
+        {
+          "annotation_id": "p0",
+          "value": "PRO",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m0"
+        },
+        {
+          "annotation_id": "p1",
+          "value": "PART",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m1"
+        },
+        {
+          "annotation_id": "p2",
+          "value": "N",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m2"
+        },
+        {
+          "annotation_id": "p3",
+          "value": "PART",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m3"
+        },
+        {
+          "annotation_id": "p4",
+          "value": "V",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m4"
+        },
+        {
+          "annotation_id": "p5",
+          "value": "SUF",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m5"
+        },
+        {
+          "annotation_id": "p6",
+          "value": "PUNCT",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "m6"
+        }
+      ],
+      "parent": "morph@A",
+      "participant": ""
+    },
+    {
+      "id": "translation@A",
+      "annotations": [
+        {
+          "annotation_id": "f1",
+          "value": "彼が本を読んだ。",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "a1"
+        }
+      ],
+      "parent": "text0@A",
+      "participant": ""
+    },
+    {
+      "id": "text@B",
+      "annotations": [
+        {
+          "annotation_id": "b1",
+          "value": "ame=ga hur-u.",
+          "start_time": 2400,
+          "end_time": 3900
+        }
+      ],
+      "parent": "",
+      "participant": "B"
+    },
+    {
+      "id": "gloss@B",
+      "annotations": [
+        {
+          "annotation_id": "bg1",
+          "value": "rain NOM fall NPST",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "b1"
+        }
+      ],
+      "parent": "text@B",
+      "participant": ""
+    },
+    {
+      "id": "translation@B",
+      "annotations": [
+        {
+          "annotation_id": "bf1",
+          "value": "雨が降る。",
+          "start_time": null,
+          "end_time": null,
+          "ref_id": "b1"
+        }
+      ],
+      "parent": "text@B",
+      "participant": ""
+    }
+  ],
+  "cases": [
+    {
+      "speakers": [
+        {
+          "name": "A",
+          "mode": "4層",
+          "tiers": {
+            "text0": "text0@A",
+            "text": "text@A",
+            "morph": "morph@A",
+            "gloss": "gloss@A",
+            "pos": "pos@A",
+            "trans": "translation@A"
+          }
+        },
+        {
+          "name": "B",
+          "mode": "シンプル3層",
+          "tiers": {
+            "text": "text@B",
+            "gloss": "gloss@B",
+            "trans": "translation@B"
+          }
+        }
+      ],
+      "sentences": [
+        {
+          "start_time": 200,
+          "end_time": 1900,
+          "speaker": "A",
+          "mode": "4層",
+          "text0": "ɕi=ga hon=o yom-da.",
+          "text": "ɕi=ga hon=o yom-da",
+          "morph": "ɕi ga hon o yom da",
+          "gloss": "3SG NOM book ACC read PST",
+          "pos": "PRO PART N PART V SUF",
+          "trans": "彼が本を読んだ。"
+        },
+        {
+          "start_time": 2400,
+          "end_time": 3900,
+          "speaker": "B",
+          "mode": "シンプル3層",
+          "text0": null,
+          "text": "ame=ga hur-u.",
+          "morph": null,
+          "gloss": "rain NOM fall NPST",
+          "pos": null,
+          "trans": "雨が降る。"
+        }
+      ],
+      "text": "(1) [A]\nɕi=ga hon=o yom-da.\nɕi=ga hon=o yom-da\n3SG=NOM book=ACC read-PST\nPRO=PART N=PART V-SUF\n彼が本を読んだ。\n\n(2) [B]\name=ga hur-u.\nrain=NOM fall-NPST\n雨が降る。\n",
+      "gb4e": {
+        "標準版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n% \\usepackage{leipzig}\n\n\\begin{document}\n\n\\begin{exe}\n\\ex\n\\textbf{[A]}\n\\glll \\textctc{}i=ga hon=o yom-da.\\\\\n      \\textctc{}i=ga hon=o yom-da\\\\\n      3SG=\\textsc{nom} book=\\textsc{acc} read-\\textsc{pst}\\\\\n\\glt 彼が本を読んだ。\n\\end{exe}\n\n\\begin{exe}\n\\ex\n\\textbf{[B]}\n\\gll ame=ga hur-u.\\\\\n     rain=\\textsc{nom} fall-\\textsc{npst}\\\\\n\\glt 雨が降る。\n\\end{exe}\n\n\\end{document}",
+        "行間調整版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n% \\usepackage{leipzig}\n\\let\\eachwordone=\\it\n\\let\\eachwordtwo=\\rm\n\\def\\glossglue{\\hfil}\n\n\\begin{document}\n\n\\begin{exe}\n\\ex\n\\textbf{[A]}\n\\glll \\textctc{}i=ga hon=o yom-da.\\\\\n      \\textctc{}i=ga hon=o yom-da\\\\\n      3SG=\\textsc{nom} book=\\textsc{acc} read-\\textsc{pst}\\\\\n\\glt `彼が本を読んだ。'%\n\\end{exe}\n\n\\begin{exe}\n\\ex\n\\textbf{[B]}\n\\gll ame=ga hur-u.\\\\\n     rain=\\textsc{nom} fall-\\textsc{npst}\\\\\n\\glt `雨が降る。'%\n\\end{exe}\n\n\\end{document}",
+        "最小限版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n\n\\begin{document}\n\n\\begin{exe}\\ex \\textbf{[A]}\n\\glll \\textctc{}i=ga hon=o yom-da.\\\\\n\\textctc{}i=ga hon=o yom-da\\\\\n3SG=\\textsc{nom} book=\\textsc{acc} read-\\textsc{pst}\\\\\n\\glt `彼が本を読んだ。'\\end{exe}\n\n\\begin{exe}\\ex \\textbf{[B]}\n\\gll ame=ga hur-u.\\\\\nrain=\\textsc{nom} fall-\\textsc{npst}\\\\\n\\glt `雨が降る。'\\end{exe}\n\n\\end{document}"
+      }
+    },
+    {
+      "speakers": [
+        {
+          "name": "B",
+          "mode": "シンプル3層",
+          "tiers": {
+            "text": "text@B",
+            "gloss": "gloss@B",
+            "trans": "translation@B"
+          }
+        }
+      ],
+      "sentences": [
+        {
+          "start_time": 2400,
+          "end_time": 3900,
+          "speaker": "B",
+          "mode": "シンプル3層",
+          "text0": null,
+          "text": "ame=ga hur-u.",
+          "morph": null,
+          "gloss": "rain NOM fall NPST",
+          "pos": null,
+          "trans": "雨が降る。"
+        }
+      ],
+      "text": "(1)\name=ga hur-u.\nrain=NOM fall-NPST\n雨が降る。\n",
+      "gb4e": {
+        "標準版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n% \\usepackage{leipzig}\n\n\\begin{document}\n\n\\begin{exe}\n\\ex\n\\gll ame=ga hur-u.\\\\\n     rain=\\textsc{nom} fall-\\textsc{npst}\\\\\n\\glt 雨が降る。\n\\end{exe}\n\n\\end{document}",
+        "行間調整版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n% \\usepackage{leipzig}\n\\let\\eachwordone=\\it\n\\let\\eachwordtwo=\\rm\n\\def\\glossglue{\\hfil}\n\n\\begin{document}\n\n\\begin{exe}\n\\ex\n\\gll ame=ga hur-u.\\\\\n     rain=\\textsc{nom} fall-\\textsc{npst}\\\\\n\\glt `雨が降る。'%\n\\end{exe}\n\n\\end{document}",
+        "最小限版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n\n\\begin{document}\n\n\\begin{exe}\\ex\n\\gll ame=ga hur-u.\\\\\nrain=\\textsc{nom} fall-\\textsc{npst}\\\\\n\\glt `雨が降る。'\\end{exe}\n\n\\end{document}"
+      }
+    },
+    {
+      "speakers": [
+        {
+          "name": "A",
+          "mode": "3層",
+          "tiers": {
+            "text": "text@A",
+            "morph": "morph@A",
+            "gloss": "gloss@A",
+            "pos": "pos@A",
+            "trans": "translation@A"
+          }
+        }
+      ],
+      "sentences": [
+        {
+          "start_time": 200,
+          "end_time": 1900,
+          "speaker": "A",
+          "mode": "3層",
+          "text0": null,
+          "text": "ɕi=ga hon=o yom-da.",
+          "morph": "ɕi ga hon o yom da",
+          "gloss": "3SG NOM book ACC read PST",
+          "pos": "PRO PART N PART V SUF",
+          "trans": "彼が本を読んだ。"
+        }
+      ],
+      "text": "(1)\nɕi=ga hon=o yom-da.\n3SG=NOM book=ACC read-PST\nPRO=PART N=PART V-SUF\n彼が本を読んだ。\n",
+      "gb4e": {
+        "標準版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n% \\usepackage{leipzig}\n\n\\begin{document}\n\n\\begin{exe}\n\\ex\n\\gll \\textctc{}i=ga hon=o yom-da.\\\\\n     3SG=\\textsc{nom} book=\\textsc{acc} read-\\textsc{pst}\\\\\n\\glt 彼が本を読んだ。\n\\end{exe}\n\n\\end{document}",
+        "行間調整版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n% \\usepackage{leipzig}\n\\let\\eachwordone=\\it\n\\let\\eachwordtwo=\\rm\n\\def\\glossglue{\\hfil}\n\n\\begin{document}\n\n\\begin{exe}\n\\ex\n\\gll \\textctc{}i=ga hon=o yom-da.\\\\\n     3SG=\\textsc{nom} book=\\textsc{acc} read-\\textsc{pst}\\\\\n\\glt `彼が本を読んだ。'%\n\\end{exe}\n\n\\end{document}",
+        "最小限版": "\\documentclass{jarticle}\n\\usepackage{gb4e}\n\\usepackage{tipa}\n\n\\begin{document}\n\n\\begin{exe}\\ex\n\\gll \\textctc{}i=ga hon=o yom-da.\\\\\n3SG=\\textsc{nom} book=\\textsc{acc} read-\\textsc{pst}\\\\\n\\glt `彼が本を読んだ。'\\end{exe}\n\n\\end{document}"
+      }
+    }
+  ]
+}
